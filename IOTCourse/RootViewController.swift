@@ -10,9 +10,14 @@ import UIKit
 
 class RootViewController: UIViewController {
 
+    var model: Model?
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        // Do any additional setup after loading the view.
+
+        if let ad = UIApplication.shared.delegate as? AppDelegate {
+            self.model = ad.model
+        }
     }
 
 
