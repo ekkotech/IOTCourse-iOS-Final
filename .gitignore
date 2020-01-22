@@ -1,0 +1,7 @@
+# IOTCourse Xcode/Swift
+#
+**.DS_Store
+ 
+**/IOTCourseTests
+**/IOTCourseUITests
+**/IOTCourse.xcodeproj

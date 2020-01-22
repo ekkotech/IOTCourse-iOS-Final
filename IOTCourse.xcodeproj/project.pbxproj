@@ -9,12 +9,20 @@
 /* Begin PBXBuildFile section */
 		D1F9D31A23D8261F00A1D93E /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D31923D8261F00A1D93E /* AppDelegate.swift */; };
 		D1F9D31C23D8261F00A1D93E /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D31B23D8261F00A1D93E /* SceneDelegate.swift */; };
-		D1F9D31E23D8261F00A1D93E /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D31D23D8261F00A1D93E /* ViewController.swift */; };
+		D1F9D31E23D8261F00A1D93E /* RootViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D31D23D8261F00A1D93E /* RootViewController.swift */; };
 		D1F9D32123D8261F00A1D93E /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D1F9D31F23D8261F00A1D93E /* Main.storyboard */; };
 		D1F9D32323D8262000A1D93E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D1F9D32223D8262000A1D93E /* Assets.xcassets */; };
 		D1F9D32623D8262000A1D93E /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D1F9D32423D8262000A1D93E /* LaunchScreen.storyboard */; };
 		D1F9D33123D8262000A1D93E /* IOTCourseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D33023D8262000A1D93E /* IOTCourseTests.swift */; };
 		D1F9D33C23D8262000A1D93E /* IOTCourseUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D33B23D8262000A1D93E /* IOTCourseUITests.swift */; };
+		D1F9D35323D826C000A1D93E /* Data.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D34A23D826C000A1D93E /* Data.swift */; };
+		D1F9D35423D826C000A1D93E /* UIColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D34B23D826C000A1D93E /* UIColor.swift */; };
+		D1F9D35523D826C000A1D93E /* CoreBluetooth.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D34C23D826C000A1D93E /* CoreBluetooth.swift */; };
+		D1F9D35623D826C000A1D93E /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D34E23D826C000A1D93E /* Log.swift */; };
+		D1F9D35723D826C000A1D93E /* AppOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D34F23D826C000A1D93E /* AppOperation.swift */; };
+		D1F9D35823D826C000A1D93E /* EventTimer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D35023D826C000A1D93E /* EventTimer.swift */; };
+		D1F9D35923D826C000A1D93E /* Protocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D35123D826C000A1D93E /* Protocols.swift */; };
+		D1F9D35A23D826C000A1D93E /* TimedOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D35223D826C000A1D93E /* TimedOperation.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -38,7 +46,7 @@
 		D1F9D31623D8261F00A1D93E /* IOTCourse.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IOTCourse.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D1F9D31923D8261F00A1D93E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		D1F9D31B23D8261F00A1D93E /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
-		D1F9D31D23D8261F00A1D93E /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+		D1F9D31D23D8261F00A1D93E /* RootViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootViewController.swift; sourceTree = "<group>"; };
 		D1F9D32023D8261F00A1D93E /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		D1F9D32223D8262000A1D93E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D1F9D32523D8262000A1D93E /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -49,6 +57,14 @@
 		D1F9D33723D8262000A1D93E /* IOTCourseUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = IOTCourseUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D1F9D33B23D8262000A1D93E /* IOTCourseUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOTCourseUITests.swift; sourceTree = "<group>"; };
 		D1F9D33D23D8262000A1D93E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		D1F9D34A23D826C000A1D93E /* Data.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Data.swift; sourceTree = "<group>"; };
+		D1F9D34B23D826C000A1D93E /* UIColor.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = UIColor.swift; sourceTree = "<group>"; };
+		D1F9D34C23D826C000A1D93E /* CoreBluetooth.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CoreBluetooth.swift; sourceTree = "<group>"; };
+		D1F9D34E23D826C000A1D93E /* Log.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
+		D1F9D34F23D826C000A1D93E /* AppOperation.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppOperation.swift; sourceTree = "<group>"; };
+		D1F9D35023D826C000A1D93E /* EventTimer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EventTimer.swift; sourceTree = "<group>"; };
+		D1F9D35123D826C000A1D93E /* Protocols.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Protocols.swift; sourceTree = "<group>"; };
+		D1F9D35223D826C000A1D93E /* TimedOperation.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TimedOperation.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -99,9 +115,11 @@
 		D1F9D31823D8261F00A1D93E /* IOTCourse */ = {
 			isa = PBXGroup;
 			children = (
+				D1F9D34923D826C000A1D93E /* Extensions */,
+				D1F9D34D23D826C000A1D93E /* Utilities */,
 				D1F9D31923D8261F00A1D93E /* AppDelegate.swift */,
 				D1F9D31B23D8261F00A1D93E /* SceneDelegate.swift */,
-				D1F9D31D23D8261F00A1D93E /* ViewController.swift */,
+				D1F9D31D23D8261F00A1D93E /* RootViewController.swift */,
 				D1F9D31F23D8261F00A1D93E /* Main.storyboard */,
 				D1F9D32223D8262000A1D93E /* Assets.xcassets */,
 				D1F9D32423D8262000A1D93E /* LaunchScreen.storyboard */,
@@ -126,6 +144,28 @@
 				D1F9D33D23D8262000A1D93E /* Info.plist */,
 			);
 			path = IOTCourseUITests;
+			sourceTree = "<group>";
+		};
+		D1F9D34923D826C000A1D93E /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+				D1F9D34A23D826C000A1D93E /* Data.swift */,
+				D1F9D34B23D826C000A1D93E /* UIColor.swift */,
+				D1F9D34C23D826C000A1D93E /* CoreBluetooth.swift */,
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
+		D1F9D34D23D826C000A1D93E /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				D1F9D34E23D826C000A1D93E /* Log.swift */,
+				D1F9D34F23D826C000A1D93E /* AppOperation.swift */,
+				D1F9D35023D826C000A1D93E /* EventTimer.swift */,
+				D1F9D35123D826C000A1D93E /* Protocols.swift */,
+				D1F9D35223D826C000A1D93E /* TimedOperation.swift */,
+			);
+			path = Utilities;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -259,9 +299,17 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D1F9D31E23D8261F00A1D93E /* ViewController.swift in Sources */,
+				D1F9D31E23D8261F00A1D93E /* RootViewController.swift in Sources */,
+				D1F9D35623D826C000A1D93E /* Log.swift in Sources */,
+				D1F9D35523D826C000A1D93E /* CoreBluetooth.swift in Sources */,
 				D1F9D31A23D8261F00A1D93E /* AppDelegate.swift in Sources */,
+				D1F9D35A23D826C000A1D93E /* TimedOperation.swift in Sources */,
 				D1F9D31C23D8261F00A1D93E /* SceneDelegate.swift in Sources */,
+				D1F9D35923D826C000A1D93E /* Protocols.swift in Sources */,
+				D1F9D35323D826C000A1D93E /* Data.swift in Sources */,
+				D1F9D35423D826C000A1D93E /* UIColor.swift in Sources */,
+				D1F9D35723D826C000A1D93E /* AppOperation.swift in Sources */,
+				D1F9D35823D826C000A1D93E /* EventTimer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -437,6 +485,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 4C885VZSZL;
 				INFOPLIST_FILE = IOTCourse/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -455,6 +504,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 4C885VZSZL;
 				INFOPLIST_FILE = IOTCourse/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
