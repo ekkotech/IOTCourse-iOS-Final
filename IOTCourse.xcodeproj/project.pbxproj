@@ -24,6 +24,7 @@
 		D1F9D35923D826C000A1D93E /* Protocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D35123D826C000A1D93E /* Protocols.swift */; };
 		D1F9D35A23D826C000A1D93E /* TimedOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D35223D826C000A1D93E /* TimedOperation.swift */; };
 		D1F9D35C23D8291300A1D93E /* BleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D35B23D8291300A1D93E /* BleService.swift */; };
+		D1F9D35E23D82CFC00A1D93E /* Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D35D23D82CFC00A1D93E /* Model.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -67,6 +68,7 @@
 		D1F9D35123D826C000A1D93E /* Protocols.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Protocols.swift; sourceTree = "<group>"; };
 		D1F9D35223D826C000A1D93E /* TimedOperation.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TimedOperation.swift; sourceTree = "<group>"; };
 		D1F9D35B23D8291300A1D93E /* BleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BleService.swift; sourceTree = "<group>"; };
+		D1F9D35D23D82CFC00A1D93E /* Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Model.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -127,6 +129,7 @@
 				D1F9D32423D8262000A1D93E /* LaunchScreen.storyboard */,
 				D1F9D32723D8262000A1D93E /* Info.plist */,
 				D1F9D35B23D8291300A1D93E /* BleService.swift */,
+				D1F9D35D23D82CFC00A1D93E /* Model.swift */,
 			);
 			path = IOTCourse;
 			sourceTree = "<group>";
@@ -308,6 +311,7 @@
 				D1F9D35C23D8291300A1D93E /* BleService.swift in Sources */,
 				D1F9D31A23D8261F00A1D93E /* AppDelegate.swift in Sources */,
 				D1F9D35A23D826C000A1D93E /* TimedOperation.swift in Sources */,
+				D1F9D35E23D82CFC00A1D93E /* Model.swift in Sources */,
 				D1F9D31C23D8261F00A1D93E /* SceneDelegate.swift in Sources */,
 				D1F9D35923D826C000A1D93E /* Protocols.swift in Sources */,
 				D1F9D35323D826C000A1D93E /* Data.swift in Sources */,
