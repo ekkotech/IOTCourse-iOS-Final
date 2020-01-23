@@ -10,6 +10,38 @@ import Foundation
 import CoreBluetooth
 import os
 
+internal let nc = NotificationCenter.default        // Application scope
+
+// MARK: - Publication topics
+//
+public extension Notification.Name {
+    static let bleStatus = Notification.Name("bleStatus")
+}
+
+//
+// Statuses
+//
+internal enum BleStatus: CustomStringConvertible {
+    case onLine
+    case offLine
+    case ready
+    
+    var description: String {
+        switch self {
+        case .offLine: return "off-line"
+        case .onLine: return "on-line"
+        case .ready: return "ready"
+        }
+    }
+}
+
+//
+// Notification Payloads
+//
+internal struct BleStatusPayload {
+    var status: BleStatus
+}
+
 // Error management
 //
 internal enum BleError: Error {
@@ -38,7 +70,7 @@ internal final class BleService: NSObject {
     private var actionMap: ActionMap = Dictionary.init(uniqueKeysWithValues: BState.allCases.map { ($0, [:])})
     private var errorMap: ErrorMap = Dictionary.init(uniqueKeysWithValues: BState.allCases.map { ($0, (nil, .Start))})
     //
-    private var discoveredPeripheral: CBPeripheral?
+    private var attachingWith: (peripheral: CBPeripheral?, suuid: CBUUID?, isAttached: Bool) = (nil, nil, false)
 
     override init() {
         super.init()
@@ -56,7 +88,7 @@ internal final class BleService: NSObject {
         
         // State action map
         stateActionMap[.Scanning] = (onEntry: performScan, onExit: nil)
-        stateActionMap[.Ready] = (onEntry: performConnect, onExit: nil)
+        stateActionMap[.Ready] = (onEntry: performNotifyAttached, onExit: nil)
         
         // Action map
         actionMap[.Start]?[.OnLine] = (action: performNullAction, nextState: .Scanning)
@@ -82,7 +114,9 @@ internal final class BleService: NSObject {
     // MARK: - Public (Internal) API
     //
     func attachPeripheral(suuid: CBUUID) {
-        //
+        
+        attachingWith = (nil, suuid, false)
+        cmdQueue.async { self.handleEvent(event: .OnLine) }
     }
     
     func read(suuid: CBUUID, cuuid: CBUUID) {
@@ -113,22 +147,28 @@ extension BleService {
     
     func performScan(event: BEvent, state: BState) throws {
         os_log("In performScan, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
-        guard let cm = centralManager else {
+        guard let cm = centralManager, let suuid = attachingWith.suuid else {
             throw BleError.UninitialisedProperty
         }
         
-        let suuid = CBUUID(string: "F0001110-0451-4000-B000-000000000000")      // TODO: Temporary
-        discoveredPeripheral = nil
+        attachingWith.peripheral = nil
         cm.scanForPeripherals(withServices: [suuid], options: nil)
     }
 
     func performConnect(event: BEvent, state: BState) throws {
         os_log("In performConnect, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
-        guard let cm = centralManager, let per = discoveredPeripheral else {
+        guard let cm = centralManager, let per = attachingWith.peripheral else {
             throw BleError.UninitialisedProperty
         }
         
         cm.connect(per, options: nil)
+    }
+
+    func performNotifyAttached(thisEvent: BEvent, thisState: BState) {
+        os_log("In performNotifyAttached, event: %s state: %s", log: Log.ble, type: .info, thisEvent.description, thisState.description)
+
+        attachingWith.isAttached = true
+        nc.post(name: .bleStatus, object: BleStatusPayload(status: .ready))
     }
 
 }
@@ -138,20 +178,25 @@ extension BleService {
 extension BleService: CBCentralManagerDelegate {
     public func centralManagerDidUpdateState(_ central: CBCentralManager) {
         os_log("Central Manager state: %s", log: Log.ble, type: .info, central.state.description)
-         switch central.state {
-         case .poweredOn:
-            cmdQueue.async { self.handleEvent(event: .OnLine) }
-         case .poweredOff, .resetting, .unsupported, .unknown:
-             cmdQueue.async { self.handleEvent(event: .OffLine) }
+        
+        var status: BleStatus
+        
+        switch central.state {
+        case .poweredOn:
+            status = .onLine
+        case .poweredOff, .resetting, .unsupported, .unknown:
+            status = .offLine
         case .unauthorized:     // iOS 13+ requires user authorisation
              os_log("Bluetooth unauthorised - set authorisation in Info.plist", log: Log.ble, type: .error, central.state.description)
              assertionFailure()
-             cmdQueue.async { self.handleEvent(event: .OffLine) }
+             status = .offLine
          @unknown default:
              os_log("Unknown central state - verify valid states for this iOS version", log: Log.ble, type: .error, central.state.description)
              assertionFailure()
-             cmdQueue.async { self.handleEvent(event: .OffLine) }
+             status = .offLine
          }
+        
+        nc.post(name: .bleStatus, object: BleStatusPayload(status: status))
     }
     
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
@@ -159,9 +204,9 @@ extension BleService: CBCentralManagerDelegate {
 
         central.stopScan()
 
-        if discoveredPeripheral == nil {        // Discard duplicate discoveries
+        if attachingWith.peripheral == nil {        // Discard duplicate discoveries
             peripheral.delegate = self
-            discoveredPeripheral = peripheral
+            attachingWith.peripheral = peripheral
             cmdQueue.async { self.handleEvent(event: .ScanSuccess) }
         }
     }

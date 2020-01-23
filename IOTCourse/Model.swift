@@ -18,12 +18,35 @@ internal final class Model {
     
     private let bleService: BleService
     private let primaryService: CBUUID
+    private var bleStatus: BleStatus = .offLine
 
     init(bleService: BleService, primaryService: CBUUID = defaultService) {
         self.bleService = bleService
         self.primaryService = primaryService
+        setupSubscriptions()
     }
-    
+
+    // MARK: - Private functions
+    //
+    private func setupSubscriptions() {
+        // Status
+        nc.addObserver(forName: .bleStatus, object: nil, queue: nil, using: { notification in
+            
+            if let payload = notification.object as? BleStatusPayload {
+                self.bleStatus = payload.status
+                os_log("BleService is %s", log: Log.model, type: .info, payload.status.description)
+                switch payload.status {
+                    case .onLine:
+                        self.bleService.attachPeripheral(suuid: self.primaryService)
+                    case .offLine:
+                        break
+                    case .ready:
+                        break
+                }
+            }})
+        
+    }
+
     // MARK: - Public (Internal) API
     //
     func get(entity: String) {
