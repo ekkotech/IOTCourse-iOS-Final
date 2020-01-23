@@ -134,7 +134,17 @@ fileprivate class BinaryEntity: Entity {
     
     // Client inbound
     func set(value: T, response: Bool) {
-        //
+        guard (permission & kPermitWrite) == kPermitWrite else { return}
+        
+        self.value = value
+        bleValue = value == false ? 0 : 1
+        bleService.write(suuid: suuid,
+                         cuuid: cuuid,
+                         data: withUnsafeBytes(of: &bleValue, { Data($0) }),
+                         response: response)
+        if response == false {
+            publish()
+        }
     }
     
     // Ble inbound
@@ -221,7 +231,12 @@ internal final class Model {
     }
     
     func set(entity: String, value: Bool, response: Bool) {
-        //
+        guard let thisEntity = lookUpByEntity[entity], bleStatus == .ready else { return }
+
+        switch thisEntity {
+        case .binary(let bin):
+            bin.set(value: value, response: response)
+        }
     }
     
     func setNotify(entity: String, state: Bool) {
