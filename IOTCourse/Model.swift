@@ -100,7 +100,9 @@ fileprivate protocol Entity {
 fileprivate extension Entity {
     // Client inbound default implementations
     func get() {
-        //
+        guard (permission & kPermitRead) == kPermitRead else { return }
+        
+        bleService.read(suuid: suuid, cuuid: cuuid)
     }
     
     func setNotify(state: Bool) {
@@ -268,6 +270,10 @@ internal final class Model {
                     case .offLine:
                         break
                     case .ready:
+                        self.redLed.get()
+                        self.greenLed.get()
+                        self.leftButton.get()
+                        self.rightButton.get()
                         self.leftButton.setNotify(state: true)
                         self.rightButton.setNotify(state: true)
                 }
@@ -314,7 +320,12 @@ internal final class Model {
     // MARK: - Public (Internal) API
     //
     func get(entity: String) {
-        //
+        guard let thisEntity = lookUpByEntity[entity], bleStatus == .ready else { return }
+
+        switch thisEntity {
+        case .binary(let bin):
+            bin.get()
+        }
     }
     
     func set(entity: String, value: Bool, response: Bool) {

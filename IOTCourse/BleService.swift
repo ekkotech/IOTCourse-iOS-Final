@@ -160,6 +160,7 @@ internal final class BleService: NSObject {
         //
         actionMap[.Ready]?[.Write] = (action: performConnect, nextState: .RWNotify)
         actionMap[.Ready]?[.SetNotify] = (action: performConnect, nextState: .RWNotify)
+        actionMap[.Ready]?[.Read] = (action: performConnect, nextState: .RWNotify)
         actionMap[.Ready]?[.OffLine] = (action: performNullAction, nextState: .Start)
         actionMap[.Ready]?[.Disconnected] = (action: performNullAction, nextState: nil)
         actionMap[.Ready]?[.DisconnectedWithError] = (action: performNullAction, nextState: nil)
@@ -218,7 +219,13 @@ internal final class BleService: NSObject {
     }
     
     func read(suuid: CBUUID, cuuid: CBUUID) {
-        //
+        opQueue.addOperation(AppOperation(queue: cmdQueue,
+                                          dispatchBlock: {
+                                            self.activeCommand = ActiveCommand(suuid: suuid,
+                                                                          cuuid: cuuid,
+                                                                          command: .read)
+                                            self.cmdQueue.async { self.handleEvent(event: .Read) }
+        }))
     }
     
     func write(suuid: CBUUID, cuuid: CBUUID, data: Data, response: Bool) {
@@ -340,6 +347,8 @@ extension BleService {
                 pl.peripheral.writeValue(data, for: pl.charac, type: type)
             case .setNotify(let state):
                 pl.peripheral.setNotifyValue(state, for: pl.charac)
+            case .read:
+                pl.peripheral.readValue(for: pl.charac)
             default:
                 break       // Complete other cases later...
             }
