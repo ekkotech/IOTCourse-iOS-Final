@@ -58,6 +58,14 @@ internal enum BleError: Error {
 //
 internal final class BleService: NSObject {
     
+    // Last attached peripheral
+    private struct LastAttachedPeripheral: Codable {
+        var peripheral: UUID
+        var suuidData: Data
+    }
+    private let kLastAttachedPeripheralKey = "lap"
+    private var ud: UserDefaults
+    //
     private var centralManager: CBCentralManager?
     private let initOptions = [CBCentralManagerOptionShowPowerAlertKey : NSNumber(value: true)]
     // Queues
@@ -72,7 +80,8 @@ internal final class BleService: NSObject {
     //
     private var attachingWith: (peripheral: CBPeripheral?, suuid: CBUUID?, isAttached: Bool) = (nil, nil, false)
 
-    override init() {
+    init(defaults: UserDefaults = UserDefaults.standard) {
+        ud = defaults
         super.init()
         setupStateMaps()
         machine = Machine.init(actionMap: actionMap, stateActionMap: stateActionMap, errorMap: errorMap)
@@ -88,19 +97,29 @@ internal final class BleService: NSObject {
         
         // State action map
         stateActionMap[.Scanning] = (onEntry: performScan, onExit: nil)
+        stateActionMap[.Retrieving] = (onEntry: performRetrieve, onExit: nil)
         stateActionMap[.Ready] = (onEntry: performNotifyAttached, onExit: nil)
         
         // Action map
-        actionMap[.Start]?[.OnLine] = (action: performNullAction, nextState: .Scanning)
+        actionMap[.Start]?[.Scan] = (action: performNullAction, nextState: .Scanning)
+        actionMap[.Start]?[.Retrieve] = (action: performNullAction, nextState: .Retrieving)
         actionMap[.Start]?[.OffLine] = (action: performNullAction, nextState: nil)
         //
         actionMap[.Scanning]?[.ScanSuccess] = (action: performNullAction, nextState: .Ready)
         actionMap[.Scanning]?[.OffLine] = (action: performNullAction, nextState: .Start)
         //
+        actionMap[.Retrieving]?[.RetrieveFail] = (action: performNullAction, nextState: .Scanning)
+        actionMap[.Retrieving]?[.ConnectSuccess] = (action: performNullAction, nextState: .Ready)
+        actionMap[.Retrieving]?[.ConnectFail] = (action: performNullAction, nextState: .Start)
+        actionMap[.Retrieving]?[.OffLine] = (action: performNullAction, nextState: .Start)
+        //
         actionMap[.Ready]?[.OffLine] = (action: performNullAction, nextState: .Start)
-        
+        actionMap[.Ready]?[.Disconnected] = (action: performNullAction, nextState: nil)
+        actionMap[.Ready]?[.DisconnectedWithError] = (action: performNullAction, nextState: nil)
+
         // Error map
         errorMap[.Scanning] = (action: performNullAction, nextState: .Start)
+        errorMap[.Retrieving] = (action: performNullAction, nextState: .Start)
         errorMap[.Ready] = (action: performNullAction, nextState: .Ready)
 
     }
@@ -111,12 +130,25 @@ internal final class BleService: NSObject {
         }
     }
 
+    private func setLastAttachedPeripheral(defaults: UserDefaults, peripheral: CBPeripheral, suuid: CBUUID) {
+        let last = LastAttachedPeripheral(peripheral: peripheral.identifier, suuidData: suuid.data)
+        defaults.set(try? JSONEncoder().encode(last), forKey: kLastAttachedPeripheralKey)
+    }
+
+    private func getLastAttachedPeripheral(defaults: UserDefaults) -> LastAttachedPeripheral? {
+        var retValue: LastAttachedPeripheral? = nil
+        if let lapData = defaults.object(forKey: kLastAttachedPeripheralKey) as? Data {
+            retValue = try? JSONDecoder().decode(LastAttachedPeripheral.self, from: lapData)
+        }
+        return retValue
+    }
+
     // MARK: - Public (Internal) API
     //
-    func attachPeripheral(suuid: CBUUID) {
+    func attachPeripheral(suuid: CBUUID, forceScan: Bool = false) {
         
         attachingWith = (nil, suuid, false)
-        cmdQueue.async { self.handleEvent(event: .OnLine) }
+        cmdQueue.async { self.handleEvent(event: forceScan ? .Scan : .Retrieve) }
     }
     
     func read(suuid: CBUUID, cuuid: CBUUID) {
@@ -168,7 +200,31 @@ extension BleService {
         os_log("In performNotifyAttached, event: %s state: %s", log: Log.ble, type: .info, thisEvent.description, thisState.description)
 
         attachingWith.isAttached = true
+        if let per = attachingWith.peripheral, let suuid = attachingWith.suuid {
+            setLastAttachedPeripheral(defaults: ud, peripheral: per, suuid: suuid)
+        }
         nc.post(name: .bleStatus, object: BleStatusPayload(status: .ready))
+    }
+
+    func performRetrieve(event: BEvent, state: BState) throws {
+        os_log("In performRetrieve, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
+        guard let cm = centralManager, let suuid = attachingWith.suuid else {
+            throw BleError.UninitialisedProperty }
+
+        if let lap = getLastAttachedPeripheral(defaults: ud), CBUUID(data: lap.suuidData) == suuid {
+            os_log("Retrieving...", log: Log.ble, type: .info)
+            if let per = cm.retrievePeripherals(withIdentifiers: [lap.peripheral]).first {
+                per.delegate = self
+                attachingWith.peripheral = per
+                cm.connect(per, options: nil)
+            }
+            else {
+                cmdQueue.async { self.handleEvent(event: .RetrieveFail) }
+            }
+        }
+        else {
+            cmdQueue.async { self.handleEvent(event: .RetrieveFail) }
+        }
     }
 
 }
@@ -214,8 +270,30 @@ extension BleService: CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         os_log("In didConnect: %s", log: Log.ble, type: .info, peripheral.identifier.uuidString)
 
+        cmdQueue.async { self.handleEvent(event: .ConnectSuccess) }
     }
 
+    func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
+        os_log("In didFailToConnect: %s", log: Log.ble, type: .info, peripheral.identifier.uuidString)
+
+        cmdQueue.async { self.handleEvent(event: .ConnectFail) }
+        
+    }
+
+    func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        os_log("In didFailToConnect: %s", log: Log.ble, type: .info, peripheral.identifier.uuidString)
+        
+        if error == nil {
+            // Intentional disconnect
+            cmdQueue.async { self.handleEvent(event: .Disconnected) }
+        }
+        else {
+            // Unexpected disconnect
+            os_log("Peripheral disconnected with error", log: Log.ble, type: .error)
+            cmdQueue.async { self.handleEvent(event: .DisconnectedWithError) }
+        }
+        
+    }
 }
 
 // MARK: - CBPeripheralDelegate
@@ -241,6 +319,7 @@ typealias ErrorMap = Dictionary<BState, (action: ((BEvent, BState) -> ())?, next
 enum BState: Int, CaseIterable {
     case Start
     case Scanning
+    case Retrieving
     case Ready
 }
 
@@ -250,6 +329,7 @@ extension BState: CustomStringConvertible {
         switch self {
         case .Start: return "Start"
         case .Scanning: return "Scanning"
+        case .Retrieving: return "Retrieving"
         case .Ready: return "Ready"
         }
     }
@@ -263,6 +343,12 @@ enum BEvent {
     case OffLine            // Bluetooth is not available (several possible reasons)
     case Scan
     case ScanSuccess
+    case Retrieve
+    case RetrieveFail
+    case ConnectSuccess
+    case ConnectFail
+    case Disconnected
+    case DisconnectedWithError
 }
 
 extension BEvent: CustomStringConvertible {
@@ -273,6 +359,12 @@ extension BEvent: CustomStringConvertible {
         case .OffLine: return "OffLine"
         case .Scan: return "Scan"
         case .ScanSuccess: return "ScanSuccess"
+        case .Retrieve: return "Retrieve"
+        case .RetrieveFail: return "RetrieveFail"
+        case .ConnectSuccess: return "Connect Success"
+        case .ConnectFail: return "Connect Fail"
+        case .Disconnected: return "Disconnected"
+        case .DisconnectedWithError: return "Disconnected With Error"
         }
     }
 }
