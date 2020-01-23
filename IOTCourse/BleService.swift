@@ -19,6 +19,7 @@ public extension Notification.Name {
     static let characWriteConfirm = Notification.Name("characWriteConfirm")
     static let characNotifyStateChanged = Notification.Name("characNotifyStateChanged")
     static let characValueChanged = Notification.Name("characValueChanged")
+    static let rssiValueChanged = Notification.Name("rssiValueChanged")
 }
 
 //
@@ -57,6 +58,10 @@ internal struct CharacNotifyStateChangedPayload {
 internal struct CharacValueChangedPayload {
     var charac: CBUUID
     var data: Data
+}
+
+internal struct RssiValueChangedPayload {
+    var value: Int
 }
 
 //
@@ -161,6 +166,7 @@ internal final class BleService: NSObject {
         actionMap[.Ready]?[.Write] = (action: performConnect, nextState: .RWNotify)
         actionMap[.Ready]?[.SetNotify] = (action: performConnect, nextState: .RWNotify)
         actionMap[.Ready]?[.Read] = (action: performConnect, nextState: .RWNotify)
+        actionMap[.Ready]?[.ReadRSSI] = (action: performConnect, nextState: .ReadRSSI)
         actionMap[.Ready]?[.OffLine] = (action: performNullAction, nextState: .Start)
         actionMap[.Ready]?[.Disconnected] = (action: performNullAction, nextState: nil)
         actionMap[.Ready]?[.DisconnectedWithError] = (action: performNullAction, nextState: nil)
@@ -173,6 +179,11 @@ internal final class BleService: NSObject {
         actionMap[.RWNotify]?[.DiscoverCharacteristicsFail] = (action: performNullAction, nextState: .Ready)
         actionMap[.RWNotify]?[.DisconnectedWithError] = (action: performNullAction, nextState: .Ready)
         actionMap[.RWNotify]?[.OffLine] = (action: performNullAction, nextState: .Start)
+        //
+        actionMap[.ReadRSSI]?[.ConnectSuccess(nil)] = (action: performReadRSSI, nextState: .Ready)
+        actionMap[.ReadRSSI]?[.ConnectFail] = (action: performNullAction, nextState: .Ready)
+        actionMap[.ReadRSSI]?[.DisconnectedWithError] = (action: performNullAction, nextState: .Ready)
+        actionMap[.ReadRSSI]?[.OffLine] = (action: performNullAction, nextState: .Start)
 
         // Error map
         errorMap[.Start] = (action: performNullAction, nextState: .Start)
@@ -249,7 +260,13 @@ internal final class BleService: NSObject {
     }
     
     func readRssi() {
-        //
+        opQueue.addOperation(AppOperation(queue: cmdQueue,
+                                          dispatchBlock: {
+                                            self.activeCommand = ActiveCommand(suuid: nil,
+                                                                               cuuid: nil,
+                                                                               command: .readRSSI)
+                                            self.cmdQueue.async { self.handleEvent(event: .ReadRSSI) }
+        }))
     }
 
 }
@@ -352,6 +369,14 @@ extension BleService {
             default:
                 break       // Complete other cases later...
             }
+    }
+
+    func performReadRSSI(thisEvent: BEvent, thisState: BState) throws {
+        os_log("In performReadRSSI, event: %s state %s", log: Log.ble, type: .info, thisEvent.description, thisState.description)
+        guard case BEvent.ConnectSuccess(let payload) = thisEvent, let pl = payload else {
+            throw BleError.InvalidPayload }
+        
+        pl.peripheral.readRSSI()
     }
 
     func performReset(thisEvent: BEvent, thisState: BState) throws {
@@ -508,6 +533,17 @@ extension BleService: CBPeripheralDelegate {
                     object: CharacValueChangedPayload(charac: characteristic.uuid,
                                                       data: cval))
         }
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didReadRSSI RSSI: NSNumber, error: Error?) {
+        os_log("In didReadRSSI: %d", log: Log.ble, type: .info, RSSI.intValue)
+        guard error == nil else {
+            os_log("ERROR: reading RSSI", log: Log.ble, type: .error)
+            return
+        }
+        
+        nc.post(name: .rssiValueChanged,
+                object: RssiValueChangedPayload(value: RSSI.intValue))
     }
 
 }

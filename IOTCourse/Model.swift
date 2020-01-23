@@ -17,6 +17,7 @@ internal let kEntityRedLed          = "redled"
 internal let kEntityGreenLed        = "greenled"
 internal let kEntityLeftButton      = "leftbutton"
 internal let kEntityRightButton     = "rightbutton"
+internal let kEntityRSSI            = "rssi"        // NOTE: Not a real entity
 
 //
 // Publication topics
@@ -26,12 +27,19 @@ public extension Notification.Name {
     static let entityGreenLed = Notification.Name(kEntityGreenLed)
     static let entityLeftButton = Notification.Name(kEntityLeftButton)
     static let entityRightButton = Notification.Name(kEntityRightButton)
+    static let entityRSSI = Notification.Name(kEntityRSSI)
 }
 
 //
 // Publication Payloads
 internal struct BinaryPayload {
     var value: Bool
+    var isNotifying: Bool
+    var didWrite: Bool
+}
+
+internal struct IntegerPayload {
+    var value: Int
     var isNotifying: Bool
     var didWrite: Bool
 }
@@ -276,6 +284,7 @@ internal final class Model {
                         self.rightButton.get()
                         self.leftButton.setNotify(state: true)
                         self.rightButton.setNotify(state: true)
+                        self.getRssi()
                 }
             }})
         
@@ -315,6 +324,19 @@ internal final class Model {
                         }
         })
 
+        // RSSI value changed
+        nc.addObserver(forName: .rssiValueChanged,
+                       object: nil,
+                       queue: nil,
+                       using: { notification in
+                        if let payload = notification.object as? RssiValueChangedPayload {
+                            os_log("RSSI: %d", log: Log.model, type: .info, payload.value)     // Temporary for debugging
+                            nc.post(name: .entityRSSI, object: IntegerPayload(value: payload.value,
+                                                                              isNotifying: false,
+                                                                              didWrite: false))
+                        }
+        })
+
     }
 
     // MARK: - Public (Internal) API
@@ -347,7 +369,8 @@ internal final class Model {
     }
     
     func getRssi() {
-        //
+        // Make a direct call to BleService
+        bleService.readRssi()
     }
 
 }
