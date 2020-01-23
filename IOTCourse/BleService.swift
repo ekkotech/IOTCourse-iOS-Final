@@ -74,6 +74,11 @@ fileprivate struct ActiveCommand {
     var command: BleCommand = .read
 }
 
+//
+// Timer parameters
+//
+fileprivate let kWatchdogTimeOut = TimeInterval(35.0)
+
 // Error management
 //
 internal enum BleError: Error {
@@ -103,6 +108,9 @@ internal final class BleService: NSObject {
     private var centralManager: CBCentralManager?
     private let initOptions = [CBCentralManagerOptionShowPowerAlertKey : NSNumber(value: true)]
     // Queues
+    private var opQueue = TimedOperationQueue(name: "com.iotcourse.opq",
+                                              QoS: .userInitiated,
+                                              timeout: kWatchdogTimeOut)
     private let cmdQueue = DispatchQueue(label: "com.iotcourse.cmdq", qos: .userInitiated)
     // State machine
     private var machine: Machine? = nil
@@ -124,6 +132,7 @@ internal final class BleService: NSObject {
                                           queue: DispatchQueue(label: "com.iotcourse.bleq",
                                                                qos: .userInitiated),
                                           options: initOptions)
+        opQueue.maxConcurrentOperationCount = 1     // Serial queue
     }
 
     // MARK: - Private functions
@@ -131,9 +140,10 @@ internal final class BleService: NSObject {
     private func setupStateMaps() {
         
         // State action map
+        stateActionMap[.Start] = (onEntry: performReset, onExit: nil)
         stateActionMap[.Scanning] = (onEntry: performScan, onExit: nil)
         stateActionMap[.Retrieving] = (onEntry: performRetrieve, onExit: nil)
-        stateActionMap[.Ready] = (onEntry: performNotifyAttached, onExit: nil)
+        stateActionMap[.Ready] = (onEntry: performStageOperation, onExit: nil)
         
         // Action map
         actionMap[.Start]?[.Scan] = (action: performNullAction, nextState: .Scanning)
@@ -191,6 +201,13 @@ internal final class BleService: NSObject {
         }
         return retValue
     }
+    
+    private func completeOperation() {
+        if let aop = opQueue.operations.first as? AppOperation {
+            aop.isExecuting = false
+            aop.isFinished = true
+        }
+    }
 
     // MARK: - Public (Internal) API
     //
@@ -205,17 +222,23 @@ internal final class BleService: NSObject {
     }
     
     func write(suuid: CBUUID, cuuid: CBUUID, data: Data, response: Bool) {
-        activeCommand = ActiveCommand(suuid: suuid,
-                                      cuuid: cuuid,
-                                      command: .write(data, response == true ? .withResponse : .withoutResponse))
-        cmdQueue.async { self.handleEvent(event: .Write) }
+        opQueue.addOperation(AppOperation(queue: cmdQueue,
+                                          dispatchBlock: {
+                                            self.activeCommand = ActiveCommand(suuid: suuid,
+                                                                          cuuid: cuuid,
+                                                                          command: .write(data, response == true ? .withResponse : .withoutResponse))
+                                            self.cmdQueue.async { self.handleEvent(event: .Write) }
+        }))
     }
     
     func setNotify(suuid: CBUUID, cuuid: CBUUID, state: Bool) {
-        activeCommand = ActiveCommand(suuid: suuid,
-                                      cuuid: cuuid,
-                                      command: .setNotify(state))
-        cmdQueue.async { self.handleEvent(event: .SetNotify) }
+        opQueue.addOperation(AppOperation(queue: cmdQueue,
+                                          dispatchBlock: {
+                                            self.activeCommand = ActiveCommand(suuid: suuid,
+                                                                          cuuid: cuuid,
+                                                                          command: .setNotify(state))
+                                            self.cmdQueue.async { self.handleEvent(event: .SetNotify) }
+        }))
     }
     
     func readRssi() {
@@ -251,7 +274,7 @@ extension BleService {
         cm.connect(per, options: nil)
     }
 
-    func performNotifyAttached(thisEvent: BEvent, thisState: BState) {
+    func performStageOperation(thisEvent: BEvent, thisState: BState) {
         os_log("In performNotifyAttached, event: %s state: %s", log: Log.ble, type: .info, thisEvent.description, thisState.description)
 
         if attachingWith.isAttached == false {
@@ -262,7 +285,7 @@ extension BleService {
             nc.post(name: .bleStatus, object: BleStatusPayload(status: .ready))
         }
         else {
-            // Complete later...
+            completeOperation()
         }
     }
 
@@ -320,6 +343,25 @@ extension BleService {
             default:
                 break       // Complete other cases later...
             }
+    }
+
+    func performReset(thisEvent: BEvent, thisState: BState) throws {
+        os_log("In performReset, event: %s state %s", log: Log.ble, type: .info, thisEvent.description, thisState.description)
+
+        if case BEvent.OffLine = thisEvent {
+            // CoreBluetooth has gone off-line, notify out
+            nc.post(name: .bleStatus, object: BleStatusPayload(status: .offLine))
+        }
+
+        attachingWith = (nil, nil, false)
+        activeCommand = ActiveCommand(suuid: nil, cuuid: nil, command: .read)
+        
+        for op in opQueue.operations {
+            if let aop = op as? AppOperation {
+                aop.isExecuting = false
+                aop.isFinished = true
+            }
+        }
     }
 
 }

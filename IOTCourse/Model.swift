@@ -269,7 +269,7 @@ internal final class Model {
                         break
                     case .ready:
                         self.leftButton.setNotify(state: true)
-                      //self.rightButton.setNotify(state: true)
+                        self.rightButton.setNotify(state: true)
                 }
             }})
         
