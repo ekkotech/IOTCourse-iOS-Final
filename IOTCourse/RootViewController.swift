@@ -10,6 +10,13 @@ import UIKit
 
 class RootViewController: UIViewController {
 
+    @IBOutlet weak var leftButtonSwitch: UISwitch!
+    @IBOutlet weak var rightButtonSwitch: UISwitch!
+    @IBOutlet weak var redLedLabel: UILabel!
+    @IBOutlet weak var greenLedLabel: UILabel!
+    @IBOutlet weak var redLedButton: UIButton!
+    @IBOutlet weak var greenLedButton: UIButton!
+    
     var model: Model?
 
     override func viewDidLoad() {
@@ -18,8 +25,42 @@ class RootViewController: UIViewController {
         if let ad = UIApplication.shared.delegate as? AppDelegate {
             self.model = ad.model
         }
+        setupControls()
     }
 
+    // MARK: - Private functions
+    //
+    private func setupControls() {
+        redLedButton.accessibilityLabel = kEntityRedLed
+        greenLedButton.accessibilityLabel = kEntityGreenLed
+     
+        redLedButton.layer.borderColor = UIColor.gray.cgColor
+        redLedButton.layer.borderWidth = 1
+        redLedButton.layer.cornerRadius = 4
+     
+        greenLedButton.layer.borderColor = UIColor.gray.cgColor
+        greenLedButton.layer.borderWidth = 1
+        greenLedButton.layer.cornerRadius = 4
+     
+        redLedLabel.layer.borderColor = UIColor.gray.cgColor
+        redLedLabel.layer.borderWidth = 1
+        redLedLabel.layer.cornerRadius = 4
+        redLedLabel.clipsToBounds = true
 
+        greenLedLabel.layer.borderColor = UIColor.gray.cgColor
+        greenLedLabel.layer.borderWidth = 1
+        greenLedLabel.layer.cornerRadius = 4
+        greenLedLabel.clipsToBounds = true
+    }
+    
+    // MARK: - UI Action Handlers
+    //
+    @IBAction func ledButtonTouchUpInside(_ sender: UIButton) {
+        guard let md = model, let topic = sender.accessibilityLabel else { return }
+        
+        sender.isSelected = !sender.isSelected
+        md.set(entity: topic, value: sender.isSelected, response: false)
+    }
+    
 }
 

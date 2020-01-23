@@ -15,9 +15,80 @@
                     <view key="view" contentMode="scaleToFill" id="8bC-Xf-vdC">
                         <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="k4O-MZ-Uu8">
+                                <rect key="frame" x="94" y="433" width="60" height="40"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" relation="greaterThanOrEqual" constant="60" id="JbA-Jo-Qm0"/>
+                                    <constraint firstAttribute="height" constant="40" id="aLb-Xt-tD3"/>
+                                </constraints>
+                                <state key="normal" title="Red"/>
+                                <connections>
+                                    <action selector="ledButtonTouchUpInside:" destination="BYZ-38-t0r" eventType="touchUpInside" id="RXv-zH-pNM"/>
+                                </connections>
+                            </button>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="zjU-fR-EFf">
+                                <rect key="frame" x="94" y="356" width="60" height="40"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="40" id="sck-bD-kCx"/>
+                                    <constraint firstAttribute="width" relation="greaterThanOrEqual" constant="60" id="uY3-fp-cab"/>
+                                </constraints>
+                                <fontDescription key="fontDescription" type="system" pointSize="17"/>
+                                <nil key="textColor"/>
+                                <nil key="highlightedColor"/>
+                            </label>
+                            <switch opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="750" verticalHuggingPriority="750" contentHorizontalAlignment="center" contentVerticalAlignment="center" on="YES" translatesAutoresizingMaskIntoConstraints="NO" id="6xJ-bi-4hT">
+                                <rect key="frame" x="99.5" y="253.5" width="51" height="31"/>
+                            </switch>
+                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="uY6-TB-bbR">
+                                <rect key="frame" x="260" y="433" width="60" height="40"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="40" id="j6x-k7-P5U"/>
+                                    <constraint firstAttribute="width" relation="greaterThanOrEqual" constant="60" id="tsw-Qd-IcA"/>
+                                </constraints>
+                                <state key="normal" title="Green"/>
+                            </button>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="aVi-da-GXn">
+                                <rect key="frame" x="260" y="356" width="60" height="40"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" relation="greaterThanOrEqual" constant="60" id="HfO-gh-CW2"/>
+                                    <constraint firstAttribute="height" constant="40" id="lKy-DE-7R4"/>
+                                </constraints>
+                                <fontDescription key="fontDescription" type="system" pointSize="17"/>
+                                <nil key="textColor"/>
+                                <nil key="highlightedColor"/>
+                            </label>
+                            <switch opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="750" verticalHuggingPriority="750" contentHorizontalAlignment="center" contentVerticalAlignment="center" on="YES" translatesAutoresizingMaskIntoConstraints="NO" id="RAe-52-WsE">
+                                <rect key="frame" x="265.5" y="253.5" width="51" height="31"/>
+                            </switch>
+                        </subviews>
                         <color key="backgroundColor" red="0.3529411764705882" green="0.90980392156862744" blue="0.80000000000000004" alpha="1" colorSpace="calibratedRGB"/>
+                        <constraints>
+                            <constraint firstItem="uY6-TB-bbR" firstAttribute="centerX" secondItem="aVi-da-GXn" secondAttribute="centerX" id="0C7-D5-dEd"/>
+                            <constraint firstItem="aVi-da-GXn" firstAttribute="centerX" secondItem="RAe-52-WsE" secondAttribute="centerX" id="64y-YK-D0c"/>
+                            <constraint firstItem="6xJ-bi-4hT" firstAttribute="centerX" secondItem="8bC-Xf-vdC" secondAttribute="centerX" multiplier="0.6" id="7cy-6V-cey"/>
+                            <constraint firstItem="uY6-TB-bbR" firstAttribute="centerY" secondItem="k4O-MZ-Uu8" secondAttribute="centerY" id="CMX-h0-3KZ"/>
+                            <constraint firstItem="k4O-MZ-Uu8" firstAttribute="centerX" secondItem="zjU-fR-EFf" secondAttribute="centerX" id="Ddl-Lr-18h"/>
+                            <constraint firstItem="RAe-52-WsE" firstAttribute="centerX" secondItem="8bC-Xf-vdC" secondAttribute="centerX" multiplier="1.4" id="JxO-O8-adP"/>
+                            <constraint firstItem="k4O-MZ-Uu8" firstAttribute="top" secondItem="zjU-fR-EFf" secondAttribute="bottom" constant="37" id="LdQ-kh-6cB"/>
+                            <constraint firstItem="RAe-52-WsE" firstAttribute="centerY" secondItem="6xJ-bi-4hT" secondAttribute="centerY" id="Tec-e2-fbl"/>
+                            <constraint firstItem="6xJ-bi-4hT" firstAttribute="centerY" secondItem="8bC-Xf-vdC" secondAttribute="centerY" multiplier="0.6" id="VHc-Fy-rN3"/>
+                            <constraint firstItem="aVi-da-GXn" firstAttribute="centerY" secondItem="zjU-fR-EFf" secondAttribute="centerY" id="dvp-nC-HtS"/>
+                            <constraint firstItem="zjU-fR-EFf" firstAttribute="top" secondItem="6xJ-bi-4hT" secondAttribute="bottom" constant="71.5" id="tBn-1a-HRu"/>
+                            <constraint firstItem="zjU-fR-EFf" firstAttribute="centerX" secondItem="6xJ-bi-4hT" secondAttribute="centerX" id="zi6-3p-15t"/>
+                        </constraints>
                         <viewLayoutGuide key="safeArea" id="6Tk-OE-BBY"/>
                     </view>
+                    <connections>
+                        <outlet property="greenButtonLabel" destination="dvp-nC-HtS" id="gq9-5C-WYX"/>
+                        <outlet property="greenLabelButton" destination="aVi-da-GXn" id="cNj-uy-f6X"/>
+                        <outlet property="greenLedButton" destination="uY6-TB-bbR" id="ULg-KW-RDg"/>
+                        <outlet property="greenLedLabel" destination="aVi-da-GXn" id="drV-DL-Ec2"/>
+                        <outlet property="leftButtonSwitch" destination="6xJ-bi-4hT" id="H34-9i-f8v"/>
+                        <outlet property="redLedButton" destination="k4O-MZ-Uu8" id="qdq-wN-h3J"/>
+                        <outlet property="redLedLabel" destination="zjU-fR-EFf" id="JmL-Fb-DUg"/>
+                        <outlet property="rightButtonSwitch" destination="RAe-52-WsE" id="BA7-iZ-Flp"/>
+                    </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="dkx-z0-nzr" sceneMemberID="firstResponder"/>
             </objects>
