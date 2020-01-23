@@ -83,6 +83,10 @@ fileprivate struct ActiveCommand {
 // Timer parameters
 //
 fileprivate let kWatchdogTimeOut = TimeInterval(35.0)
+fileprivate let scanTimeout             = TimeInterval(20.0)
+fileprivate let connectAttemptTimeout   = TimeInterval(10.0)
+fileprivate let connectionTimeout       = TimeInterval(10.0)
+fileprivate let readRSSITimeout         = TimeInterval(0.5)
 
 // Error management
 //
@@ -117,6 +121,7 @@ internal final class BleService: NSObject {
                                               QoS: .userInitiated,
                                               timeout: kWatchdogTimeOut)
     private let cmdQueue = DispatchQueue(label: "com.iotcourse.cmdq", qos: .userInitiated)
+    private let eventTimer = EventTimer()
     // State machine
     private var machine: Machine? = nil
     // State maps
@@ -156,17 +161,20 @@ internal final class BleService: NSObject {
         actionMap[.Start]?[.OffLine] = (action: performNullAction, nextState: nil)
         //
         actionMap[.Scanning]?[.ScanSuccess] = (action: performNullAction, nextState: .Ready)
+        actionMap[.Scanning]?[.ScanTimeout] = (action: performNullAction, nextState: .Start)
         actionMap[.Scanning]?[.OffLine] = (action: performNullAction, nextState: .Start)
         //
         actionMap[.Retrieving]?[.RetrieveFail] = (action: performNullAction, nextState: .Scanning)
         actionMap[.Retrieving]?[.ConnectSuccess(nil)] = (action: performNullAction, nextState: .Ready)
         actionMap[.Retrieving]?[.ConnectFail] = (action: performNullAction, nextState: .Start)
+        actionMap[.Retrieving]?[.Disconnected] = (action: performNullAction, nextState: .Scanning)
         actionMap[.Retrieving]?[.OffLine] = (action: performNullAction, nextState: .Start)
         //
         actionMap[.Ready]?[.Write] = (action: performConnect, nextState: .RWNotify)
         actionMap[.Ready]?[.SetNotify] = (action: performConnect, nextState: .RWNotify)
         actionMap[.Ready]?[.Read] = (action: performConnect, nextState: .RWNotify)
         actionMap[.Ready]?[.ReadRSSI] = (action: performConnect, nextState: .ReadRSSI)
+        actionMap[.Ready]?[.Disconnected] = (action: performNullAction, nextState: nil)
         actionMap[.Ready]?[.OffLine] = (action: performNullAction, nextState: .Start)
         actionMap[.Ready]?[.Disconnected] = (action: performNullAction, nextState: nil)
         actionMap[.Ready]?[.DisconnectedWithError] = (action: performNullAction, nextState: nil)
@@ -177,11 +185,13 @@ internal final class BleService: NSObject {
         actionMap[.RWNotify]?[.ConnectFail] = (action: performNullAction, nextState: .Ready)
         actionMap[.RWNotify]?[.DiscoverServicesFail] = (action: performNullAction, nextState: .Ready)
         actionMap[.RWNotify]?[.DiscoverCharacteristicsFail] = (action: performNullAction, nextState: .Ready)
+        actionMap[.RWNotify]?[.Disconnected] = (action: performNullAction, nextState: .Ready)
         actionMap[.RWNotify]?[.DisconnectedWithError] = (action: performNullAction, nextState: .Ready)
         actionMap[.RWNotify]?[.OffLine] = (action: performNullAction, nextState: .Start)
         //
         actionMap[.ReadRSSI]?[.ConnectSuccess(nil)] = (action: performReadRSSI, nextState: .Ready)
         actionMap[.ReadRSSI]?[.ConnectFail] = (action: performNullAction, nextState: .Ready)
+        actionMap[.ReadRSSI]?[.Disconnected] = (action: performNullAction, nextState: .Ready)
         actionMap[.ReadRSSI]?[.DisconnectedWithError] = (action: performNullAction, nextState: .Ready)
         actionMap[.ReadRSSI]?[.OffLine] = (action: performNullAction, nextState: .Start)
 
@@ -286,6 +296,14 @@ extension BleService {
         }
         
         attachingWith.peripheral = nil
+        eventTimer.scheduleEvent(fromNow: scanTimeout,
+                                 onTimeout: {
+                                    os_log("Scan timed out", log: Log.ble, type: .info)
+                                    cm.stopScan()
+                                    self.cmdQueue.async {
+                                        self.handleEvent(event: .ScanTimeout)
+                                    }},
+                                 onCancel: nil)
         cm.scanForPeripherals(withServices: [suuid], options: nil)
     }
 
@@ -295,6 +313,12 @@ extension BleService {
             throw BleError.UninitialisedProperty
         }
         
+        eventTimer.scheduleEvent(fromNow: connectAttemptTimeout,
+                                 onTimeout: {
+                                    os_log("Connect attempt timed out", log: Log.ble, type: .info)
+                                    cm.cancelPeripheralConnection(per)
+                                    },
+                                 onCancel: nil)
         cm.connect(per, options: nil)
     }
 
@@ -323,6 +347,12 @@ extension BleService {
             if let per = cm.retrievePeripherals(withIdentifiers: [lap.peripheral]).first {
                 per.delegate = self
                 attachingWith.peripheral = per
+                eventTimer.scheduleEvent(fromNow: connectAttemptTimeout,
+                                         onTimeout: {
+                                            os_log("Connect attempt timed out", log: Log.ble, type: .info)
+                                            cm.cancelPeripheralConnection(per)
+                                            },
+                                         onCancel: nil)
                 cm.connect(per, options: nil)
             }
             else {
@@ -429,6 +459,7 @@ extension BleService: CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
         os_log("In didDiscoverPeripheral: %s", log: Log.ble, type: .info, peripheral.identifier.uuidString)
 
+        eventTimer.cancel()
         central.stopScan()
 
         if attachingWith.peripheral == nil {        // Discard duplicate discoveries
@@ -440,6 +471,17 @@ extension BleService: CBCentralManagerDelegate {
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         os_log("In didConnect: %s", log: Log.ble, type: .info, peripheral.identifier.uuidString)
+
+        let timeout: TimeInterval
+        if case BleCommand.readRSSI = activeCommand.command { timeout = readRSSITimeout }
+        else { timeout = connectionTimeout }
+         
+        eventTimer.scheduleEvent(fromNow: timeout,
+                                  onTimeout: {
+                                     os_log("Connection timed out", log: Log.ble, type: .info)
+                                     central.cancelPeripheralConnection(peripheral)
+                                     },
+                                  onCancel: nil)
 
         let payload = PPayload(peripheral: peripheral)
         cmdQueue.async { self.handleEvent(event: .ConnectSuccess(payload)) }
