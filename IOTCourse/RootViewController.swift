@@ -50,7 +50,25 @@ class RootViewController: UIViewController {
                             self.greenLedButton.isSelected = payload.value
                         }
         })
-        
+        // Left button
+        nc.addObserver(forName: .entityLeftButton,
+                       object: nil,
+                       queue: OperationQueue.main,
+                       using: { notification in
+                        if let payload = notification.object as? BinaryPayload {
+                            self.leftButtonSwitch.isOn = payload.value
+                        }
+        })
+        // Right button
+        nc.addObserver(forName: .entityRightButton,
+                       object: nil,
+                       queue: OperationQueue.main,
+                       using: { notification in
+                        if let payload = notification.object as? BinaryPayload {
+                            self.rightButtonSwitch.isOn = payload.value
+                        }
+        })
+
     }
 
     // MARK: - Private functions
