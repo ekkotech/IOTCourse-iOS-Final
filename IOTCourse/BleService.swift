@@ -16,6 +16,7 @@ internal let nc = NotificationCenter.default        // Application scope
 //
 public extension Notification.Name {
     static let bleStatus = Notification.Name("bleStatus")
+    static let characWriteConfirm = Notification.Name("characWriteConfirm")
 }
 
 //
@@ -40,6 +41,10 @@ internal enum BleStatus: CustomStringConvertible {
 //
 internal struct BleStatusPayload {
     var status: BleStatus
+}
+
+internal struct CharacWriteConfirmPayload {
+    var charac: CBUUID
 }
 
 //
@@ -395,6 +400,18 @@ extension BleService: CBPeripheralDelegate {
         
         let payload = PSCPayload(peripheral: peripheral, service: service, charac: thisCharac)
         cmdQueue.async { self.handleEvent(event: .DiscoverCharacteristicsSuccess(payload)) }
+    }
+
+    // MARK: Data Callbacks
+    func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
+        os_log("In didWriteValueFor: %s", log: Log.ble, type: .info, characteristic.uuid.uuidString)
+        guard error == nil else {
+            os_log("ERROR: writing characteristic value", log: Log.ble, type: .error)
+            return
+        }
+        
+        nc.post(name: .characWriteConfirm,
+                object: CharacWriteConfirmPayload(charac: characteristic.uuid))
     }
 
 }
