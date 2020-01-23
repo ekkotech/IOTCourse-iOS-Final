@@ -15,6 +15,8 @@ import os
 //
 internal let kEntityRedLed          = "redled"
 internal let kEntityGreenLed        = "greenled"
+internal let kEntityLeftButton      = "leftbutton"
+internal let kEntityRightButton     = "rightbutton"
 
 //
 // Publication topics
@@ -22,6 +24,8 @@ internal let kEntityGreenLed        = "greenled"
 public extension Notification.Name {
     static let entityRedLed = Notification.Name(kEntityRedLed)
     static let entityGreenLed = Notification.Name(kEntityGreenLed)
+    static let entityLeftButton = Notification.Name(kEntityLeftButton)
+    static let entityRightButton = Notification.Name(kEntityRightButton)
 }
 
 //
@@ -45,6 +49,10 @@ fileprivate let tiBaseUuid              = "F0000000-0451-4000-B000-000000000000"
 fileprivate let ledServiceShortUuid     = "1110"
 fileprivate let redLedShortUuid         = "1111"
 fileprivate let greenLedShortUuid       = "1112"
+// Button service
+fileprivate let buttonServiceShortUuid  = "1120"
+fileprivate let leftButtonShortUuid     = "1121"
+fileprivate let rightButtonShortUuid    = "1122"
 
 //
 // CBUUIDs
@@ -52,6 +60,10 @@ fileprivate let greenLedShortUuid       = "1112"
 fileprivate let ledServiceUuid = CBUUID(baseUuid: tiBaseUuid, shortUuid: ledServiceShortUuid)
 fileprivate let redLedUuid = CBUUID(baseUuid: tiBaseUuid, shortUuid: redLedShortUuid)
 fileprivate let greenLedUuid = CBUUID(baseUuid: tiBaseUuid, shortUuid: greenLedShortUuid)
+// Button service
+fileprivate let buttonServiceUuid = CBUUID(baseUuid: tiBaseUuid, shortUuid: buttonServiceShortUuid)
+fileprivate let leftButtonUuid = CBUUID(baseUuid: tiBaseUuid, shortUuid: leftButtonShortUuid)
+fileprivate let rightButtonUuid = CBUUID(baseUuid: tiBaseUuid, shortUuid: rightButtonShortUuid)
 
 fileprivate let defaultService = ledServiceUuid
 
@@ -92,7 +104,11 @@ fileprivate extension Entity {
     }
     
     func setNotify(state: Bool) {
-        //
+        guard (permission & kPermitNotify) == kPermitNotify else { return }
+        
+        bleService.setNotify(suuid: suuid,
+                             cuuid: cuuid,
+                             state: state)
     }
     
     // Ble inbound default implementations
@@ -103,7 +119,8 @@ fileprivate extension Entity {
     }
     
     mutating func notifyStateChanged(state: Bool) {
-        //
+        isNotifying = state
+        publish()
     }
     
 }
@@ -151,7 +168,14 @@ fileprivate class BinaryEntity: Entity {
     
     // Ble inbound
     func valueChanged(data: Data) {
-        //
+        guard let result = data.to(type: UInt8.self) else {
+            os_log("ERROR: converting data", log: Log.model, type: .error)
+            return
+        }
+        
+        bleValue = result
+        value = result == 0 ? false : true
+        publish()
     }
     
     // Publication
@@ -179,6 +203,8 @@ internal final class Model {
     private var bleStatus: BleStatus = .offLine
     private let redLed: BinaryEntity
     private let greenLed: BinaryEntity
+    private let leftButton: BinaryEntity
+    private let rightButton: BinaryEntity
     private let lookUpByEntity: [String : EntityType]
     private let lookUpByCharac: [CBUUID : EntityType]
 
@@ -199,11 +225,30 @@ internal final class Model {
                                 permission: kPermitRead | kPermitWrite,
                                 bleService: bleService,
                                 defaultValue: false)
+        leftButton = BinaryEntity(name: kEntityLeftButton,
+                                  topic: .entityLeftButton,
+                                  suuid: buttonServiceUuid,
+                                  cuuid: leftButtonUuid,
+                                  permission: kPermitRead | kPermitNotify,
+                                  bleService: bleService,
+                                  defaultValue: false)
+        rightButton = BinaryEntity(name: kEntityRightButton,
+                                   topic: .entityRightButton,
+                                   suuid: buttonServiceUuid,
+                                   cuuid: rightButtonUuid,
+                                   permission: kPermitRead | kPermitNotify,
+                                   bleService: bleService,
+                                   defaultValue: false)
         lookUpByEntity = [kEntityRedLed : .binary(redLed),
-                          kEntityGreenLed : .binary(greenLed)
+                          kEntityGreenLed : .binary(greenLed),
+                          kEntityLeftButton : .binary(leftButton),
+                          kEntityRightButton : .binary(rightButton)
         ]
         lookUpByCharac = [redLedUuid : .binary(redLed),
-                          greenLedUuid : .binary(greenLed)
+                          greenLedUuid : .binary(greenLed),
+                          leftButtonUuid : .binary(leftButton),
+                          rightButtonUuid : .binary(rightButton)
+
         ]
         setupSubscriptions()
     }
@@ -223,7 +268,8 @@ internal final class Model {
                     case .offLine:
                         break
                     case .ready:
-                        break
+                        self.leftButton.setNotify(state: true)
+                      //self.rightButton.setNotify(state: true)
                 }
             }})
         
@@ -236,6 +282,32 @@ internal final class Model {
                     bin.writeConfirm()
                 }
             }})
+        // Charac notification state
+        nc.addObserver(forName: .characNotifyStateChanged,
+                       object: nil,
+                       queue: nil,
+                       using: { notification in
+                        if let payload = notification.object as? CharacNotifyStateChangedPayload,
+                            let thisEntity = self.lookUpByCharac[payload.charac] {
+                            switch thisEntity {
+                            case .binary(var bin):
+                                bin.notifyStateChanged(state: payload.state)
+                            }
+                        }
+        })
+        // Charac value
+        nc.addObserver(forName: .characValueChanged,
+                       object: nil,
+                       queue: nil,
+                       using: { notification in
+                        if let payload = notification.object as? CharacValueChangedPayload,
+                            let thisEntity = self.lookUpByCharac[payload.charac] {
+                            switch thisEntity {
+                            case .binary(let bin):
+                                bin.valueChanged(data: payload.data)
+                            }
+                        }
+        })
 
     }
 
@@ -255,7 +327,12 @@ internal final class Model {
     }
     
     func setNotify(entity: String, state: Bool) {
-        //
+        guard let thisEntity = lookUpByEntity[entity], bleStatus == .ready else { return }
+
+        switch thisEntity {
+        case .binary(let bin):
+            bin.setNotify(state: state)
+        }
     }
     
     func getRssi() {
