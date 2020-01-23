@@ -97,7 +97,9 @@ fileprivate extension Entity {
     
     // Ble inbound default implementations
     mutating func writeConfirm() {
-        //
+        didWrite = true
+        publish()
+        didWrite = false
     }
     
     mutating func notifyStateChanged(state: Bool) {
@@ -154,7 +156,10 @@ fileprivate class BinaryEntity: Entity {
     
     // Publication
     func publish() {
-        //
+        nc.post(name: topic,
+                object: BinaryPayload(value: value,
+                                      isNotifying: isNotifying,
+                                      didWrite: didWrite))
     }
     
 }
@@ -222,6 +227,16 @@ internal final class Model {
                 }
             }})
         
+        // Write confirm
+        nc.addObserver(forName: .characWriteConfirm, object: nil, queue: nil, using: { notification in
+            if let payload = notification.object as? CharacWriteConfirmPayload,
+                let thisEntity = self.lookUpByCharac[payload.charac] {
+                switch thisEntity {
+                case .binary(var bin):
+                    bin.writeConfirm()
+                }
+            }})
+
     }
 
     // MARK: - Public (Internal) API
