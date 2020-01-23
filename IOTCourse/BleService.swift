@@ -42,14 +42,31 @@ internal struct BleStatusPayload {
     var status: BleStatus
 }
 
+//
+// Ble Commands
+fileprivate enum BleCommand {
+    case read
+    case write(Data, CBCharacteristicWriteType)
+    case setNotify(Bool)
+    case readRSSI
+}
+
+fileprivate struct ActiveCommand {
+    var suuid: CBUUID?
+    var cuuid: CBUUID?
+    var command: BleCommand = .read
+}
+
 // Error management
 //
 internal enum BleError: Error {
     case UninitialisedProperty
+    case InvalidPayload
     
     var description: String {
         switch self {
         case .UninitialisedProperty: return "Required property is nil"
+        case .InvalidPayload: return "Invalid payload"
         }
     }
 }
@@ -79,6 +96,7 @@ internal final class BleService: NSObject {
     private var errorMap: ErrorMap = Dictionary.init(uniqueKeysWithValues: BState.allCases.map { ($0, (nil, .Start))})
     //
     private var attachingWith: (peripheral: CBPeripheral?, suuid: CBUUID?, isAttached: Bool) = (nil, nil, false)
+    private var activeCommand = ActiveCommand()
 
     init(defaults: UserDefaults = UserDefaults.standard) {
         ud = defaults
@@ -109,18 +127,31 @@ internal final class BleService: NSObject {
         actionMap[.Scanning]?[.OffLine] = (action: performNullAction, nextState: .Start)
         //
         actionMap[.Retrieving]?[.RetrieveFail] = (action: performNullAction, nextState: .Scanning)
-        actionMap[.Retrieving]?[.ConnectSuccess] = (action: performNullAction, nextState: .Ready)
+        actionMap[.Retrieving]?[.ConnectSuccess(nil)] = (action: performNullAction, nextState: .Ready)
         actionMap[.Retrieving]?[.ConnectFail] = (action: performNullAction, nextState: .Start)
         actionMap[.Retrieving]?[.OffLine] = (action: performNullAction, nextState: .Start)
         //
+        actionMap[.Ready]?[.Write] = (action: performConnect, nextState: .RWNotify)
         actionMap[.Ready]?[.OffLine] = (action: performNullAction, nextState: .Start)
         actionMap[.Ready]?[.Disconnected] = (action: performNullAction, nextState: nil)
         actionMap[.Ready]?[.DisconnectedWithError] = (action: performNullAction, nextState: nil)
+        //
+        actionMap[.RWNotify]?[.ConnectSuccess(nil)] = (action: performDiscoverServices, nextState: nil)
+        actionMap[.RWNotify]?[.DiscoverServicesSuccess(nil)] = (action: performDiscoverCharacteristics, nextState: nil)
+        actionMap[.RWNotify]?[.DiscoverCharacteristicsSuccess(nil)] = (action: performCommand, nextState: .Ready)
+        actionMap[.RWNotify]?[.ConnectFail] = (action: performNullAction, nextState: .Ready)
+        actionMap[.RWNotify]?[.DiscoverServicesFail] = (action: performNullAction, nextState: .Ready)
+        actionMap[.RWNotify]?[.DiscoverCharacteristicsFail] = (action: performNullAction, nextState: .Ready)
+        actionMap[.RWNotify]?[.DisconnectedWithError] = (action: performNullAction, nextState: .Ready)
+        actionMap[.RWNotify]?[.OffLine] = (action: performNullAction, nextState: .Start)
 
         // Error map
+        errorMap[.Start] = (action: performNullAction, nextState: .Start)
         errorMap[.Scanning] = (action: performNullAction, nextState: .Start)
         errorMap[.Retrieving] = (action: performNullAction, nextState: .Start)
         errorMap[.Ready] = (action: performNullAction, nextState: .Ready)
+        errorMap[.RWNotify] = (action: performNullAction, nextState: .Ready)
+        errorMap[.ReadRSSI] = (action: performNullAction, nextState: .Ready)
 
     }
     
@@ -156,7 +187,10 @@ internal final class BleService: NSObject {
     }
     
     func write(suuid: CBUUID, cuuid: CBUUID, data: Data, response: Bool) {
-        //
+        activeCommand = ActiveCommand(suuid: suuid,
+                                      cuuid: cuuid,
+                                      command: .write(data, response == true ? .withResponse : .withoutResponse))
+        cmdQueue.async { self.handleEvent(event: .Write) }
     }
     
     func setNotify(suuid: CBUUID, cuuid: CBUUID, state: Bool) {
@@ -199,11 +233,16 @@ extension BleService {
     func performNotifyAttached(thisEvent: BEvent, thisState: BState) {
         os_log("In performNotifyAttached, event: %s state: %s", log: Log.ble, type: .info, thisEvent.description, thisState.description)
 
-        attachingWith.isAttached = true
-        if let per = attachingWith.peripheral, let suuid = attachingWith.suuid {
-            setLastAttachedPeripheral(defaults: ud, peripheral: per, suuid: suuid)
+        if attachingWith.isAttached == false {
+            attachingWith.isAttached = true
+            if let per = attachingWith.peripheral, let suuid = attachingWith.suuid {
+                setLastAttachedPeripheral(defaults: ud, peripheral: per, suuid: suuid)
+            }
+            nc.post(name: .bleStatus, object: BleStatusPayload(status: .ready))
         }
-        nc.post(name: .bleStatus, object: BleStatusPayload(status: .ready))
+        else {
+            // Complete later...
+        }
     }
 
     func performRetrieve(event: BEvent, state: BState) throws {
@@ -225,6 +264,39 @@ extension BleService {
         else {
             cmdQueue.async { self.handleEvent(event: .RetrieveFail) }
         }
+    }
+
+    func performDiscoverServices(thisEvent: BEvent, thisState: BState) throws {
+        os_log("In performDiscoverServices, event: %s state %s", log: Log.ble, type: .info, thisEvent.description, thisState.description)
+        guard case BEvent.ConnectSuccess(let payload) = thisEvent, let pl = payload else {
+            throw BleError.InvalidPayload }
+        guard let suuid = activeCommand.suuid else {
+            throw BleError.UninitialisedProperty }
+                
+        pl.peripheral.discoverServices([suuid])
+    }
+
+    func performDiscoverCharacteristics(thisEvent: BEvent, thisState: BState) throws {
+        os_log("In performDiscoverCharacteristics, event: %s state %s", log: Log.ble, type: .info, thisEvent.description, thisState.description)
+        guard case BEvent.DiscoverServicesSuccess(let payload) = thisEvent, let pl = payload else {
+            throw BleError.InvalidPayload }
+        guard let cuuid = activeCommand.cuuid else {
+            throw BleError.UninitialisedProperty }
+        
+        pl.peripheral.discoverCharacteristics([cuuid], for: pl.service)
+    }
+
+    func performCommand(thisEvent: BEvent, thisState: BState) throws {
+        os_log("In performCommand, event: %s state %s", log: Log.ble, type: .info, thisEvent.description, thisState.description)
+        guard case BEvent.DiscoverCharacteristicsSuccess(let payload) = thisEvent, let pl = payload else {
+            throw BleError.InvalidPayload }
+            
+            switch activeCommand.command {
+            case .write(let data, let type):
+                pl.peripheral.writeValue(data, for: pl.charac, type: type)
+            default:
+                break       // Complete other cases later...
+            }
     }
 
 }
@@ -270,7 +342,8 @@ extension BleService: CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         os_log("In didConnect: %s", log: Log.ble, type: .info, peripheral.identifier.uuidString)
 
-        cmdQueue.async { self.handleEvent(event: .ConnectSuccess) }
+        let payload = PPayload(peripheral: peripheral)
+        cmdQueue.async { self.handleEvent(event: .ConnectSuccess(payload)) }
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
@@ -299,7 +372,31 @@ extension BleService: CBCentralManagerDelegate {
 // MARK: - CBPeripheralDelegate
 //
 extension BleService: CBPeripheralDelegate {
-    //
+
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
+        guard error == nil,
+            let suuid = activeCommand.suuid,
+            let svcs = peripheral.services,
+            let thisSvce = (svcs.filter { $0.uuid == suuid }).first else {
+                cmdQueue.async { self.handleEvent(event: .DiscoverServicesFail) }
+                return }
+        
+        let payload = PSPayload(peripheral: peripheral, service: thisSvce)
+        cmdQueue.async { self.handleEvent(event: .DiscoverServicesSuccess(payload)) }
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
+        guard error == nil,
+            let cuuid = activeCommand.cuuid,
+            let characs = service.characteristics,
+            let thisCharac = (characs.filter { $0.uuid == cuuid }).first else {
+                cmdQueue.async { self.handleEvent(event: .DiscoverCharacteristicsFail) }
+                return }
+        
+        let payload = PSCPayload(peripheral: peripheral, service: service, charac: thisCharac)
+        cmdQueue.async { self.handleEvent(event: .DiscoverCharacteristicsSuccess(payload)) }
+    }
+
 }
 
 // MARK: - State Machine
@@ -321,6 +418,8 @@ enum BState: Int, CaseIterable {
     case Scanning
     case Retrieving
     case Ready
+    case RWNotify
+    case ReadRSSI
 }
 
 extension BState: CustomStringConvertible {
@@ -331,6 +430,8 @@ extension BState: CustomStringConvertible {
         case .Scanning: return "Scanning"
         case .Retrieving: return "Retrieving"
         case .Ready: return "Ready"
+        case .RWNotify: return "RWNotify"
+        case .ReadRSSI: return "ReadRSSI"
         }
     }
 }
@@ -338,17 +439,36 @@ extension BState: CustomStringConvertible {
 //
 // Valid events
 //
+struct PPayload { var peripheral: CBPeripheral }
+struct PSPayload { var peripheral: CBPeripheral; var service: CBService }
+struct PSCPayload { var peripheral: CBPeripheral; var service: CBService; var charac: CBCharacteristic }
+
 enum BEvent {
     case OnLine             // Bluetooth is powered on and available
     case OffLine            // Bluetooth is not available (several possible reasons)
     case Scan
     case ScanSuccess
+    case ScanCancelled
+    case ScanTimeout
     case Retrieve
     case RetrieveFail
-    case ConnectSuccess
+    case ConnectSuccess(PPayload?)
     case ConnectFail
+    case ConnectAttemptTimeout
+    case ConnectionTimeout
     case Disconnected
     case DisconnectedWithError
+    case Read
+    case Write
+    case SetNotify
+    case ReadRSSI
+    case DiscoverServices
+    case DiscoverServicesSuccess(PSPayload?)
+    case DiscoverServicesFail
+    case DiscoverCharacteristics
+    case DiscoverCharacteristicsSuccess(PSCPayload?)
+    case DiscoverCharacteristicsFail
+
 }
 
 extension BEvent: CustomStringConvertible {
@@ -359,12 +479,62 @@ extension BEvent: CustomStringConvertible {
         case .OffLine: return "OffLine"
         case .Scan: return "Scan"
         case .ScanSuccess: return "ScanSuccess"
+        case .ScanCancelled: return "ScanCancelled"
+        case .ScanTimeout: return "Scan Timeout"
         case .Retrieve: return "Retrieve"
         case .RetrieveFail: return "RetrieveFail"
         case .ConnectSuccess: return "Connect Success"
         case .ConnectFail: return "Connect Fail"
+        case .ConnectAttemptTimeout: return "Connect Attempt Timeout"
+        case .ConnectionTimeout: return "Connection Timeout"
         case .Disconnected: return "Disconnected"
         case .DisconnectedWithError: return "Disconnected With Error"
+        case .Read: return "Read"
+        case .Write: return "Write"
+        case .SetNotify: return "Set Notify"
+        case .ReadRSSI: return "Read RSSI"
+        case .DiscoverServices: return "Discover Services"
+        case .DiscoverServicesSuccess: return "Discover Services Success"
+        case .DiscoverServicesFail: return "Discover Services Fail"
+        case .DiscoverCharacteristics: return "Discover Characteristics"
+        case .DiscoverCharacteristicsSuccess: return "Discover Characteristics Success"
+        case .DiscoverCharacteristicsFail: return "Discover Characteristics Fail"
+        }
+    }
+}
+
+extension BEvent: Hashable {
+    static func == (lhs: BEvent, rhs: BEvent) -> Bool {
+        return lhs.hashValue == rhs.hashValue ? true : false
+    }
+
+    func hash(into hasher: inout Hasher) {
+
+        switch self {
+        case .OnLine: hasher.combine(0)
+        case .OffLine: hasher.combine(1)
+        case .Scan: hasher.combine(4)
+        case .ScanSuccess: hasher.combine(5)
+        case .ScanCancelled: hasher.combine(6)
+        case .ScanTimeout: hasher.combine(7)
+        case .Retrieve: hasher.combine(2)
+        case .RetrieveFail: hasher.combine(3)
+        case .ConnectSuccess: hasher.combine(8)
+        case .ConnectFail: hasher.combine(9)
+        case .ConnectAttemptTimeout: hasher.combine(10)
+        case .ConnectionTimeout: hasher.combine(11)
+        case .Disconnected: hasher.combine(12)
+        case .DisconnectedWithError: hasher.combine(13)
+        case .Read: hasher.combine(14)
+        case .Write: hasher.combine(15)
+        case .SetNotify: hasher.combine(16)
+        case .ReadRSSI: hasher.combine(17)
+        case .DiscoverServices: hasher.combine(18)
+        case .DiscoverServicesSuccess: hasher.combine(19)
+        case .DiscoverServicesFail: hasher.combine(20)
+        case .DiscoverCharacteristics: hasher.combine(21)
+        case .DiscoverCharacteristicsSuccess: hasher.combine(22)
+        case .DiscoverCharacteristicsFail: hasher.combine(23)
         }
     }
 }

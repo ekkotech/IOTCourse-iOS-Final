@@ -47,6 +47,9 @@
                                     <constraint firstAttribute="width" relation="greaterThanOrEqual" constant="60" id="tsw-Qd-IcA"/>
                                 </constraints>
                                 <state key="normal" title="Green"/>
+                                <connections>
+                                    <action selector="ledButtonTouchUpInside:" destination="BYZ-38-t0r" eventType="touchUpInside" id="CQ0-Rb-Azg"/>
+                                </connections>
                             </button>
                             <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="aVi-da-GXn">
                                 <rect key="frame" x="260" y="356" width="60" height="40"/>
@@ -80,8 +83,6 @@
                         <viewLayoutGuide key="safeArea" id="6Tk-OE-BBY"/>
                     </view>
                     <connections>
-                        <outlet property="greenButtonLabel" destination="dvp-nC-HtS" id="gq9-5C-WYX"/>
-                        <outlet property="greenLabelButton" destination="aVi-da-GXn" id="cNj-uy-f6X"/>
                         <outlet property="greenLedButton" destination="uY6-TB-bbR" id="ULg-KW-RDg"/>
                         <outlet property="greenLedLabel" destination="aVi-da-GXn" id="drV-DL-Ec2"/>
                         <outlet property="leftButtonSwitch" destination="6xJ-bi-4hT" id="H34-9i-f8v"/>
