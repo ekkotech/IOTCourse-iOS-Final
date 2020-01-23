@@ -26,6 +26,31 @@ class RootViewController: UIViewController {
             self.model = ad.model
         }
         setupControls()
+        setupSubscriptions()
+    }
+
+    private func setupSubscriptions() {
+        // Red Led
+        nc.addObserver(forName: .entityRedLed,
+                       object: nil,
+                       queue: OperationQueue.main,
+                       using: { notification in
+                        if let payload = notification.object as? BinaryPayload {
+                            self.redLedLabel.backgroundColor = payload.value == true ? UIColor.red : UIColor.clear
+                            self.redLedButton.isSelected = payload.value
+                        }
+        })
+        // Green Led
+        nc.addObserver(forName: .entityGreenLed,
+                       object: nil,
+                       queue: OperationQueue.main,
+                       using: { notification in
+                        if let payload = notification.object as? BinaryPayload {
+                            self.greenLedLabel.backgroundColor = payload.value == true ? UIColor.green : UIColor.clear
+                            self.greenLedButton.isSelected = payload.value
+                        }
+        })
+        
     }
 
     // MARK: - Private functions
@@ -58,8 +83,7 @@ class RootViewController: UIViewController {
     @IBAction func ledButtonTouchUpInside(_ sender: UIButton) {
         guard let md = model, let topic = sender.accessibilityLabel else { return }
         
-        sender.isSelected = !sender.isSelected
-        md.set(entity: topic, value: sender.isSelected, response: false)
+        md.set(entity: topic, value: !sender.isSelected, response: false)
     }
     
 }

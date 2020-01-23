@@ -17,6 +17,8 @@ internal let nc = NotificationCenter.default        // Application scope
 public extension Notification.Name {
     static let bleStatus = Notification.Name("bleStatus")
     static let characWriteConfirm = Notification.Name("characWriteConfirm")
+    static let characNotifyStateChanged = Notification.Name("characNotifyStateChanged")
+    static let characValueChanged = Notification.Name("characValueChanged")
 }
 
 //
@@ -45,6 +47,16 @@ internal struct BleStatusPayload {
 
 internal struct CharacWriteConfirmPayload {
     var charac: CBUUID
+}
+
+internal struct CharacNotifyStateChangedPayload {
+    var charac: CBUUID
+    var state: Bool
+}
+
+internal struct CharacValueChangedPayload {
+    var charac: CBUUID
+    var data: Data
 }
 
 //
@@ -137,6 +149,7 @@ internal final class BleService: NSObject {
         actionMap[.Retrieving]?[.OffLine] = (action: performNullAction, nextState: .Start)
         //
         actionMap[.Ready]?[.Write] = (action: performConnect, nextState: .RWNotify)
+        actionMap[.Ready]?[.SetNotify] = (action: performConnect, nextState: .RWNotify)
         actionMap[.Ready]?[.OffLine] = (action: performNullAction, nextState: .Start)
         actionMap[.Ready]?[.Disconnected] = (action: performNullAction, nextState: nil)
         actionMap[.Ready]?[.DisconnectedWithError] = (action: performNullAction, nextState: nil)
@@ -199,7 +212,10 @@ internal final class BleService: NSObject {
     }
     
     func setNotify(suuid: CBUUID, cuuid: CBUUID, state: Bool) {
-        //
+        activeCommand = ActiveCommand(suuid: suuid,
+                                      cuuid: cuuid,
+                                      command: .setNotify(state))
+        cmdQueue.async { self.handleEvent(event: .SetNotify) }
     }
     
     func readRssi() {
@@ -299,6 +315,8 @@ extension BleService {
             switch activeCommand.command {
             case .write(let data, let type):
                 pl.peripheral.writeValue(data, for: pl.charac, type: type)
+            case .setNotify(let state):
+                pl.peripheral.setNotifyValue(state, for: pl.charac)
             default:
                 break       // Complete other cases later...
             }
@@ -412,6 +430,33 @@ extension BleService: CBPeripheralDelegate {
         
         nc.post(name: .characWriteConfirm,
                 object: CharacWriteConfirmPayload(charac: characteristic.uuid))
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
+        os_log("In didUpdateNotificationStateFor: %s", log: Log.ble, type: .info, characteristic.uuid.uuidString)
+        guard error == nil else {
+            os_log("ERROR: updating notification state", log: Log.ble, type: .error)
+            return
+        }
+
+        nc.post(name: .characNotifyStateChanged,
+                object: CharacNotifyStateChangedPayload(charac: characteristic.uuid,
+                                                        state: characteristic.isNotifying))
+
+    }
+    
+    func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
+        os_log("In didUpdateValueFor: %s", log: Log.ble, type: .info, characteristic.uuid.uuidString)
+        guard error == nil else {
+            os_log("ERROR: updating characteristic value", log: Log.ble, type: .error)
+            return
+        }
+        
+        if let cval = characteristic.value {
+            nc.post(name: .characValueChanged,
+                    object: CharacValueChangedPayload(charac: characteristic.uuid,
+                                                      data: cval))
+        }
     }
 
 }
