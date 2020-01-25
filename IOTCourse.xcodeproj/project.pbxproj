@@ -11,6 +11,7 @@
 		D1D30D0323DBDD0D00982A0B /* ColorPickerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1D30D0223DBDD0D00982A0B /* ColorPickerViewController.swift */; };
 		D1D30D0523DBDDD900982A0B /* HSBColorPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1D30D0423DBDDD900982A0B /* HSBColorPicker.swift */; };
 		D1D30D0723DBDDEA00982A0B /* RGBColorPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1D30D0623DBDDEA00982A0B /* RGBColorPicker.swift */; };
+		D1D30D0A23DBE32F00982A0B /* ThumbTack.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1D30D0923DBE32F00982A0B /* ThumbTack.swift */; };
 		D1F9D31A23D8261F00A1D93E /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D31923D8261F00A1D93E /* AppDelegate.swift */; };
 		D1F9D31C23D8261F00A1D93E /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D31B23D8261F00A1D93E /* SceneDelegate.swift */; };
 		D1F9D31E23D8261F00A1D93E /* RootViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D31D23D8261F00A1D93E /* RootViewController.swift */; };
@@ -53,6 +54,7 @@
 		D1D30D0223DBDD0D00982A0B /* ColorPickerViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorPickerViewController.swift; sourceTree = "<group>"; };
 		D1D30D0423DBDDD900982A0B /* HSBColorPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HSBColorPicker.swift; sourceTree = "<group>"; };
 		D1D30D0623DBDDEA00982A0B /* RGBColorPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RGBColorPicker.swift; sourceTree = "<group>"; };
+		D1D30D0923DBE32F00982A0B /* ThumbTack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbTack.swift; sourceTree = "<group>"; };
 		D1F9D31623D8261F00A1D93E /* IOTCourse.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IOTCourse.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D1F9D31923D8261F00A1D93E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		D1F9D31B23D8261F00A1D93E /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -123,6 +125,14 @@
 			path = Controls;
 			sourceTree = "<group>";
 		};
+		D1D30D0823DBE31500982A0B /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				D1D30D0923DBE32F00982A0B /* ThumbTack.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
 		D1F9D30D23D8261F00A1D93E = {
 			isa = PBXGroup;
 			children = (
@@ -146,6 +156,7 @@
 		D1F9D31823D8261F00A1D93E /* IOTCourse */ = {
 			isa = PBXGroup;
 			children = (
+				D1D30D0823DBE31500982A0B /* Views */,
 				D1D30CFF23DBDCCA00982A0B /* Controls */,
 				D1D30CFE23DBDCBC00982A0B /* View Controllers */,
 				D1F9D34923D826C000A1D93E /* Extensions */,
@@ -346,6 +357,7 @@
 				D1D30D0523DBDDD900982A0B /* HSBColorPicker.swift in Sources */,
 				D1F9D31C23D8261F00A1D93E /* SceneDelegate.swift in Sources */,
 				D1F9D35923D826C000A1D93E /* Protocols.swift in Sources */,
+				D1D30D0A23DBE32F00982A0B /* ThumbTack.swift in Sources */,
 				D1F9D35323D826C000A1D93E /* Data.swift in Sources */,
 				D1F9D35423D826C000A1D93E /* UIColor.swift in Sources */,
 				D1F9D35723D826C000A1D93E /* AppOperation.swift in Sources */,
