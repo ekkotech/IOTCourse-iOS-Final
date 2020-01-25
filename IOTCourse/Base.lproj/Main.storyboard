@@ -186,6 +186,9 @@
                                     <constraint firstAttribute="width" constant="80" id="ytA-hj-yzl"/>
                                 </constraints>
                                 <state key="normal" image="lampOff"/>
+                                <connections>
+                                    <action selector="offOnButtonTouchUpInside:" destination="KYp-Tl-hdo" eventType="touchUpInside" id="0l2-cc-aNq"/>
+                                </connections>
                             </button>
                             <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="---" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="vEB-Rs-LrR">
                                 <rect key="frame" x="72" y="11" width="42" height="18"/>

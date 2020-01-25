@@ -445,6 +445,7 @@ internal final class Model {
                     case .ready:
                         self.getRssi()
                         self.rgb.get()
+                        self.offOn.get()
 //                        self.redLed.get()
 //                        self.greenLed.get()
 //                        self.leftButton.get()

@@ -84,7 +84,23 @@ class HeaderViewController: UIViewController {
                             self.rssiLabel.text = "\(payload.value)" + "dBm"
                         }
         })
+        nc.addObserver(forName: .entityLssOffOn,
+                       object: nil,
+                       queue: OperationQueue.main,
+                       using: { notification in
+                        if let payload = notification.object as? BinaryPayload {
+                            self.offOnButton.isSelected = payload.value
+                        }
+        })
 
+    }
+
+    // MARK: - IBAction handlers
+    //
+    @IBAction func offOnButtonTouchUpInside(_ sender: UIButton) {
+        if let md = model {
+            md.set(entity: kEntityLssOffOn, value: !sender.isSelected, response: false)
+        }
     }
 
 }
