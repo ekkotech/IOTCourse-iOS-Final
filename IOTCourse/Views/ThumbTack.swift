@@ -89,11 +89,25 @@ class ThumbTack: UIView {
 
         if (color.lightness >= autoDarkenThreshold) && !isDark {
             isDark = true
+            #if TARGET_INTERFACE_BUILDER
             layer.backgroundColor = defaultOuterColorDark.cgColor
+            #else
+            let animation = CABasicAnimation(keyPath: "backgroundColor")
+            animation.fromValue = defaultOuterColorLight.cgColor
+            layer.backgroundColor = defaultOuterColorDark.cgColor
+            layer.add(animation, forKey: "backgroundColor")
+            #endif
         }
         else if (color.lightness < autoDarkenThreshold) && isDark {
             isDark = false
+            #if TARGET_INTERFACE_BUILDER
             layer.backgroundColor = defaultOuterColorLight.cgColor
+            #else
+            let animation = CABasicAnimation(keyPath: "backgroundColor")
+            animation.fromValue = defaultOuterColorDark.cgColor
+            layer.backgroundColor = defaultOuterColorLight.cgColor
+            layer.add(animation, forKey: "backgroundColor")
+            #endif
         }
     }
 

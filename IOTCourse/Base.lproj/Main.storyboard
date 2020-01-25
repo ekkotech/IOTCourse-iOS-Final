@@ -118,6 +118,11 @@
                                 <constraints>
                                     <constraint firstAttribute="height" constant="144" id="wVg-oZ-BwB"/>
                                 </constraints>
+                                <userDefinedRuntimeAttributes>
+                                    <userDefinedRuntimeAttribute type="color" keyPath="value">
+                                        <color key="value" red="1" green="1" blue="0.74748501712328763" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                    </userDefinedRuntimeAttribute>
+                                </userDefinedRuntimeAttributes>
                             </view>
                         </subviews>
                         <color key="backgroundColor" systemColor="systemBackgroundColor" cocoaTouchSystemColor="whiteColor"/>
