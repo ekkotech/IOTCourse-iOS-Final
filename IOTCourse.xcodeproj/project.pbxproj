@@ -13,6 +13,7 @@
 		D1D30D0723DBDDEA00982A0B /* RGBColorPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1D30D0623DBDDEA00982A0B /* RGBColorPicker.swift */; };
 		D1D30D0A23DBE32F00982A0B /* ThumbTack.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1D30D0923DBE32F00982A0B /* ThumbTack.swift */; };
 		D1D30D0C23DBE7C400982A0B /* ColorSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1D30D0B23DBE7C400982A0B /* ColorSlider.swift */; };
+		D1D30D0E23DBF4F100982A0B /* Page2ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1D30D0D23DBF4F100982A0B /* Page2ViewController.swift */; };
 		D1F9D31A23D8261F00A1D93E /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D31923D8261F00A1D93E /* AppDelegate.swift */; };
 		D1F9D31C23D8261F00A1D93E /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D31B23D8261F00A1D93E /* SceneDelegate.swift */; };
 		D1F9D31E23D8261F00A1D93E /* RootViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F9D31D23D8261F00A1D93E /* RootViewController.swift */; };
@@ -57,6 +58,7 @@
 		D1D30D0623DBDDEA00982A0B /* RGBColorPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RGBColorPicker.swift; sourceTree = "<group>"; };
 		D1D30D0923DBE32F00982A0B /* ThumbTack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbTack.swift; sourceTree = "<group>"; };
 		D1D30D0B23DBE7C400982A0B /* ColorSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorSlider.swift; sourceTree = "<group>"; };
+		D1D30D0D23DBF4F100982A0B /* Page2ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Page2ViewController.swift; sourceTree = "<group>"; };
 		D1F9D31623D8261F00A1D93E /* IOTCourse.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IOTCourse.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D1F9D31923D8261F00A1D93E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		D1F9D31B23D8261F00A1D93E /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -114,6 +116,7 @@
 				D1F9D31D23D8261F00A1D93E /* RootViewController.swift */,
 				D1D30D0023DBDCFC00982A0B /* HeaderViewController.swift */,
 				D1D30D0223DBDD0D00982A0B /* ColorPickerViewController.swift */,
+				D1D30D0D23DBF4F100982A0B /* Page2ViewController.swift */,
 			);
 			path = "View Controllers";
 			sourceTree = "<group>";
@@ -357,6 +360,7 @@
 				D1F9D31A23D8261F00A1D93E /* AppDelegate.swift in Sources */,
 				D1D30D0723DBDDEA00982A0B /* RGBColorPicker.swift in Sources */,
 				D1F9D35A23D826C000A1D93E /* TimedOperation.swift in Sources */,
+				D1D30D0E23DBF4F100982A0B /* Page2ViewController.swift in Sources */,
 				D1F9D35E23D82CFC00A1D93E /* Model.swift in Sources */,
 				D1D30D0523DBDDD900982A0B /* HSBColorPicker.swift in Sources */,
 				D1F9D31C23D8261F00A1D93E /* SceneDelegate.swift in Sources */,

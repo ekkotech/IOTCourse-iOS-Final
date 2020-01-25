@@ -50,6 +50,23 @@ class ColorSlider: UIControl {
     @IBInspectable internal var value: UIColor  {
         set {
             _value = newValue
+
+            switch channel {
+            case .red:
+                startColor = _value.withRedComponent(0.0)
+                endColor = _value.withRedComponent(1.0)
+            case .green:
+                startColor = _value.withGreenComponent(0.0)
+                endColor = _value.withGreenComponent(1.0)
+            case .blue:
+                startColor = _value.withBlueComponent(0.0)
+                endColor = _value.withBlueComponent(1.0)
+            case .mono:
+                startColor = UIColor.black
+                endColor = UIColor.white
+            }
+            trackLayer.colors = [startColor.cgColor, endColor.cgColor]
+            updateThumbTack(thumb: thumbTack, color: _value, channel: channel)
         }
         get {
             return _value
@@ -96,6 +113,9 @@ class ColorSlider: UIControl {
     private func commonInit() {
         self.layer.addSublayer(trackLayer)
         self.addSubview(thumbTack)
+
+        addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(handleTap)))
+        addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(handlePan)))
     }
 
     // MARK: - Rendering
@@ -151,11 +171,17 @@ class ColorSlider: UIControl {
     // MARK: - Action Handlers
     //
     @objc private func handleTap(_ sender: UITapGestureRecognizer) {
-
+        if sender.state == .ended {
+            _value = valueForBoundedLocation(location: sender.location(in: self), bounds: activeFrame)
+        sendActions(for: .valueChanged)
+        }
     }
 
     @objc private func handlePan(_ sender: UIPanGestureRecognizer) {
-
+        if sender.state == .began || sender.state == .changed || sender.state == .ended {
+            _value = valueForBoundedLocation(location: sender.location(in: self), bounds: activeFrame)
+        sendActions(for: .valueChanged)
+        }
     }
 
     // MARK: - Private Functions
@@ -172,7 +198,19 @@ class ColorSlider: UIControl {
     */
     private func valueForBoundedLocation(location: CGPoint, bounds: CGRect) -> UIColor {
 
-        return UIColor.white
+        let position = location.x < bounds.origin.x ? 0.0 : (location.x >= bounds.origin.x + bounds.width ? 1.0 : (location.x - bounds.origin.x) / bounds.width)
+
+        switch channel {
+        case .red:
+            return _value.withRedComponent(position)
+        case .green:
+            return _value.withGreenComponent(position)
+        case .blue:
+            return _value.withBlueComponent(position)
+        case .mono:
+            return _value.withBrightnessComponent(position)
+
+        }
     }
 
     /**

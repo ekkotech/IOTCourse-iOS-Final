@@ -52,7 +52,7 @@
         <!--Item 2-->
         <scene sceneID="2GE-R7-r11">
             <objects>
-                <viewController id="RcY-Vg-OfA" sceneMemberID="viewController">
+                <viewController id="RcY-Vg-OfA" customClass="Page2ViewController" customModule="IOTCourse" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="g23-sp-prT">
                         <rect key="frame" x="0.0" y="0.0" width="414" height="778"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
@@ -89,6 +89,9 @@
                         <viewLayoutGuide key="safeArea" id="yPM-Hv-9KI"/>
                     </view>
                     <tabBarItem key="tabBarItem" title="Item 2" id="JHo-hc-HVj"/>
+                    <connections>
+                        <outlet property="slider" destination="VJN-Jx-y4Y" id="hqu-jw-ChO"/>
+                    </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="KE9-hO-2P8" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
