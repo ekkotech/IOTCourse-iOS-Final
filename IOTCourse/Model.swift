@@ -20,6 +20,10 @@ internal let kEntityRightButton     = "rightbutton"
 internal let kEntityRSSI            = "rssi"        // NOTE: Not a real entity
 internal let kEntityLssOffOn        = "lssoffon"
 internal let kEntityLssRgb          = "lssrgb"
+internal let kEntityAlsLumin        = "alslumin"
+internal let kEntityAlsThresh       = "alsthresh"
+internal let kEntityAlsHyst         = "alshyst"
+internal let kEntityAlsOffOn        = "alsoffon"
 
 //
 // Publication topics
@@ -32,6 +36,10 @@ public extension Notification.Name {
     static let entityRSSI = Notification.Name(kEntityRSSI)
     static let entityLssOffOn = Notification.Name(kEntityLssOffOn)
     static let entityLssRgb = Notification.Name(kEntityLssRgb)
+    static let entityAlsLumin = Notification.Name(kEntityAlsLumin)
+    static let entityAlsThresh = Notification.Name(kEntityAlsThresh)
+    static let entityAlsHyst = Notification.Name(kEntityAlsHyst)
+    static let entityAlsOffOn = Notification.Name(kEntityAlsOffOn)
 }
 
 //
@@ -124,6 +132,24 @@ fileprivate let alsLmOffOnUuid = CBUUID(baseUuid: iotBaseUuid, shortUuid: lmOffO
 fileprivate let defaultService = lssServiceUuid
 
 //
+// Validation constants
+// Threshold
+internal let alsThreshMinValue = 10
+internal let alsThreshMaxValue = 600
+internal let alsThreshBleMinValue = UInt16(alsThreshMinValue)
+internal let alsThreshBleMaxValue = UInt16(alsThreshMaxValue)
+// Hysteresis
+internal let alsHystMinValue = 1
+internal let alsHystMaxValue = 10
+internal let alsHystBleMinValue = UInt8(alsHystMinValue)
+internal let alsHystBleMaxValue = UInt8(alsHystMaxValue)
+// Luminance
+internal let alsLuminMinValue = 0
+internal let alsLuminMaxValue = 660
+internal let alsLuminBleMinValue = UInt16(alsLuminMinValue)
+internal let alsLuminBleMaxValue = UInt16(alsLuminMaxValue)
+
+//
 // Entity definitions
 //
 fileprivate protocol Entity {
@@ -151,6 +177,17 @@ fileprivate protocol Entity {
     mutating func notifyStateChanged(state: Bool)
     // Publication
     func publish()
+}
+
+fileprivate protocol ValidatedEntity {
+    associatedtype V
+    associatedtype W
+    
+    var minValue: V { get set }
+    var maxValue: V { get set }
+    var bleMinValue: W { get set }
+    var bleMaxValue: W { get set }
+    
 }
 
 fileprivate extension Entity {
@@ -336,11 +373,159 @@ fileprivate class RgbEntity: Entity {
 
 }
 
+fileprivate class IntegerEntity: Entity, ValidatedEntity {
+    typealias T = Int
+    typealias U = UInt16
+    typealias V = T
+    typealias W = U
+
+    let name: String
+    let topic: Notification.Name
+    var isNotifying: Bool = false
+    var didWrite: Bool = false
+    let suuid: CBUUID
+    let cuuid: CBUUID
+    let permission: UInt8
+    let bleService: BleService
+    let nc: NotificationCenter = NotificationCenter.default
+    var value: T
+    var bleValue: U
+    var minValue: V
+    var maxValue: V
+    var bleMinValue: W
+    var bleMaxValue: W
+    
+    init(name: String, topic: Notification.Name, suuid: CBUUID, cuuid: CBUUID, permission: UInt8, bleService: BleService, defaultValue: T, minValue: V, maxValue: V, bleMinValue: W, bleMaxValue: W) {
+        self.name = name
+        self.topic = topic
+        self.suuid = suuid
+        self.cuuid = cuuid
+        self.permission = permission
+        self.bleService = bleService
+        self.value = defaultValue
+        self.bleValue = UInt16(defaultValue)
+        self.minValue = minValue
+        self.maxValue = maxValue
+        self.bleMinValue = bleMinValue
+        self.bleMaxValue = bleMaxValue
+    }
+    
+    // Client inbound
+    func set(value: T, response: Bool) {
+        guard (permission & kPermitWrite) == kPermitWrite else { return}
+        
+        self.value = max(minValue, (min(maxValue, value)))
+        bleValue = U(self.value)
+        bleService.write(suuid: suuid,
+                         cuuid: cuuid,
+                         data: withUnsafeBytes(of: &bleValue, { Data($0) }),
+                         response: response)
+        if response == false {
+            publish()
+        }
+    }
+    
+    // Ble inbound
+    func valueChanged(data: Data) {
+        guard let result = data.to(type: U.self) else {
+            os_log("ERROR: converting data", log: Log.model, type: .error)
+            return
+        }
+        
+        bleValue = max(bleMinValue, min(bleMaxValue, result))
+        value = T(bleValue)
+        publish()
+    }
+    
+    // Publication
+    func publish() {
+        nc.post(name: topic,
+                object: IntegerPayload(value: value,
+                                   isNotifying: isNotifying,
+                                   didWrite: didWrite))
+    }
+}
+
+fileprivate class SmallIntegerEntity: Entity, ValidatedEntity {
+    typealias T = Int
+    typealias U = UInt8
+    typealias V = T
+    typealias W = U
+    
+    let name: String
+    let topic: Notification.Name
+    var isNotifying: Bool = false
+    var didWrite: Bool = false
+    let suuid: CBUUID
+    let cuuid: CBUUID
+    let permission: UInt8
+    let bleService: BleService
+    let nc: NotificationCenter = NotificationCenter.default
+    var value: T
+    var bleValue: U
+    var minValue: V
+    var maxValue: V
+    var bleMinValue: W
+    var bleMaxValue: W
+    
+    init(name: String, topic: Notification.Name, suuid: CBUUID, cuuid: CBUUID, permission: UInt8, bleService: BleService, defaultValue: T, minValue: V, maxValue: V, bleMinValue: W, bleMaxValue: W) {
+        self.name = name
+        self.topic = topic
+        self.suuid = suuid
+        self.cuuid = cuuid
+        self.permission = permission
+        self.bleService = bleService
+        self.value = defaultValue
+        self.bleValue = U(defaultValue)
+        self.minValue = minValue
+        self.maxValue = maxValue
+        self.bleMinValue = bleMinValue
+        self.bleMaxValue = bleMaxValue
+    }
+    
+    // Client inbound
+    func set(value: T, response: Bool) {
+        guard (permission & kPermitWrite) == kPermitWrite else { return}
+        
+        self.value = max(minValue, min(maxValue, value))
+        bleValue = U(self.value)
+        bleService.write(suuid: suuid,
+                         cuuid: cuuid,
+                         data: withUnsafeBytes(of: &bleValue, { Data($0) }),
+                         response: response)
+        if response == false {
+            publish()
+        }
+    }
+    
+    // Ble inbound
+    func valueChanged(data: Data) {
+        guard let result = data.to(type: U.self) else {
+            os_log("ERROR: converting data", log: Log.model, type: .error)
+            return
+        }
+        
+        bleValue = max(bleMinValue, min(bleMaxValue, result))
+        value = T(bleValue)
+        publish()
+    }
+    
+    // Publication
+    func publish() {
+        nc.post(name: topic,
+                object: IntegerPayload(value: value,
+                                       isNotifying: isNotifying,
+                                       didWrite: didWrite))
+    }
+}
+
 //
 // Entity Types
 fileprivate enum EntityType {
     case binary(BinaryEntity)
     case rgb(RgbEntity)
+    case integer(IntegerEntity)
+    case smallInteger(SmallIntegerEntity)
 }
 
 //
@@ -363,6 +548,10 @@ internal final class Model {
     private let rightButton: BinaryEntity
     private let offOn: BinaryEntity
     private let rgb: RgbEntity
+    private let lumin: IntegerEntity
+    private let thresh: IntegerEntity
+    private let hyst: SmallIntegerEntity
+    private let lmOffOn: BinaryEntity
     private let lookUpByEntity: [String : EntityType]
     private let lookUpByCharac: [CBUUID : EntityType]
 
@@ -411,19 +600,67 @@ internal final class Model {
                              permission: kPermitRead | kPermitWrite,
                              bleService: bleService,
                              defaultValue: false)
+        lumin = IntegerEntity(name: kEntityAlsLumin,
+                              topic: .entityAlsLumin,
+                              suuid: alsServiceUuid,
+                              cuuid: alsLuminUuid,
+                              permission: kPermitRead | kPermitNotify,
+                              bleService: bleService,
+                              defaultValue: alsLuminMinValue,
+                              minValue: alsLuminMinValue,
+                              maxValue: alsLuminMaxValue,
+                              bleMinValue: alsLuminBleMinValue,
+                              bleMaxValue: alsLuminBleMaxValue)
+        thresh = IntegerEntity(name: kEntityAlsThresh,
+                               topic: .entityAlsThresh,
+                               suuid: alsServiceUuid,
+                               cuuid: alsThreshUuid,
+                               permission: kPermitRead | kPermitWrite,
+                               bleService: bleService,
+                               defaultValue: alsThreshMinValue,
+                               minValue: alsThreshMinValue,
+                               maxValue: alsThreshMaxValue,
+                               bleMinValue: alsThreshBleMinValue,
+                               bleMaxValue: alsThreshBleMaxValue)
+        hyst = SmallIntegerEntity(name: kEntityAlsHyst,
+                                  topic: .entityAlsHyst,
+                                  suuid: alsServiceUuid,
+                                  cuuid: alsHystUuid,
+                                  permission: kPermitRead | kPermitWrite,
+                                  bleService: bleService,
+                                  defaultValue: alsHystMinValue,
+                                  minValue: alsHystMinValue,
+                                  maxValue: alsHystMaxValue,
+                                  bleMinValue: alsHystBleMinValue,
+                                  bleMaxValue: alsHystBleMaxValue)
+        lmOffOn = BinaryEntity(name: kEntityAlsOffOn,
+                               topic: .entityAlsOffOn,
+                               suuid: alsServiceUuid,
+                               cuuid: alsLmOffOnUuid,
+                               permission: kPermitRead | kPermitWrite,
+                               bleService: bleService,
+                               defaultValue: true)
         lookUpByEntity = [kEntityRedLed : .binary(redLed),
                           kEntityGreenLed : .binary(greenLed),
                           kEntityLeftButton : .binary(leftButton),
                           kEntityRightButton : .binary(rightButton),
                           kEntityLssRgb : .rgb(rgb),
-                          kEntityLssOffOn : .binary(offOn)
+                          kEntityLssOffOn : .binary(offOn),
+                          kEntityAlsLumin : .integer(lumin),
+                          kEntityAlsThresh : .integer(thresh),
+                          kEntityAlsHyst : .smallInteger(hyst),
+                          kEntityAlsOffOn : .binary(lmOffOn)
         ]
         lookUpByCharac = [redLedUuid : .binary(redLed),
                           greenLedUuid : .binary(greenLed),
                           leftButtonUuid : .binary(leftButton),
                           rightButtonUuid : .binary(rightButton),
                           lssRgbUuid : .rgb(rgb),
-                          lssOffOnUuid : .binary(offOn)
+                          lssOffOnUuid : .binary(offOn),
+                          alsLuminUuid : .integer(lumin),
+                          alsThreshUuid : .integer(thresh),
+                          alsHystUuid : .smallInteger(hyst),
+                          alsLmOffOnUuid : .binary(lmOffOn)
         ]
         setupSubscriptions()
     }
@@ -464,6 +701,10 @@ internal final class Model {
                     bin.writeConfirm()
                 case .rgb(var rgb):
                     rgb.writeConfirm()
+                case .integer(var large):
+                    large.writeConfirm()
+                case .smallInteger(var small):
+                    small.writeConfirm()
                 }
             }})
         // Charac notification state
@@ -478,6 +719,10 @@ internal final class Model {
                                 bin.notifyStateChanged(state: payload.state)
                             case .rgb(_):
                                 break       // Not meaningful for rgb
+                            case .integer(var large):
+                                large.notifyStateChanged(state: payload.state)
+                            case .smallInteger(var small):
+                                small.notifyStateChanged(state: payload.state)
                             }
                         }
         })
@@ -493,6 +738,10 @@ internal final class Model {
                                 bin.valueChanged(data: payload.data)
                             case .rgb(let rgb):
                                 rgb.valueChanged(data: payload.data)
+                            case .integer(let large):
+                                large.valueChanged(data: payload.data)
+                            case .smallInteger(let small):
+                                small.valueChanged(data: payload.data)
                             }
                         }
         })
@@ -522,6 +771,10 @@ internal final class Model {
             bin.get()
         case .rgb(let rgb):
             rgb.get()
+        case .integer(let large):
+            large.get()
+        case .smallInteger(let small):
+            small.get()
         }
     }
     
@@ -535,6 +788,12 @@ internal final class Model {
         case .rgb(let rgb):
             guard let val = value as? Rgb else { return }
             rgb.set(value: val, response: response)
+        case .integer(let large):
+            guard let val = value as? Int else { return }
+            large.set(value: val, response: response)
+        case .smallInteger(let small):
+            guard let val = value as? Int else { return }
+            small.set(value: val, response: response)
         }
     }
     
@@ -546,6 +805,10 @@ internal final class Model {
             bin.setNotify(state: state)
         case .rgb(_):
             break       // Not meaningful for rgb
+        case .integer(let large):
+            large.setNotify(state: state)
+        case .smallInteger(let small):
+            small.setNotify(state: state)
         }
     }
     
