@@ -8,8 +8,20 @@
 
 import UIKit
 
+//
+// Display related constants
+//
+let notAttachedImageName = "notAttached"
+let notConnectedImageName = "notConnected"
+let connectedImageName = "connected"
+
 class HeaderViewController: UIViewController {
 
+    @IBOutlet weak var connectStatusImage: UIImageView!
+    @IBOutlet weak var rssiLabel: UILabel!
+    @IBOutlet weak var offOnButton: UIButton!
+    @IBOutlet weak var moreButton: UIButton!
+    
     var model: Model?
 
     override func viewDidLoad() {
@@ -19,18 +31,20 @@ class HeaderViewController: UIViewController {
             self.model = ad.model
         }
 
-        // Do any additional setup after loading the view.
+        setupControls()
     }
     
 
-    /*
-    // MARK: - Navigation
+    // MARK: - Private functions
+    //
+    private func setupControls() {
+        
+        offOnButton.layer.borderWidth = 1.0
+        offOnButton.layer.borderColor = UIColor.lightGray.cgColor
+        offOnButton.layer.cornerRadius = offOnButton.frame.height / 4.0
+        offOnButton.setImage(UIImage(named: "lampOn"), for: .selected)
+        offOnButton.setImage(UIImage(named: "lampOff"), for: .normal)
 
-    // In a storyboard-based application, you will often want to do a little preparation before navigation
-    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        // Get the new view controller using segue.destination.
-        // Pass the selected object to the new view controller.
     }
-    */
 
 }
