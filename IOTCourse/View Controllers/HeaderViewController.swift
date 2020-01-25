@@ -76,6 +76,15 @@ class HeaderViewController: UIViewController {
                                 }
                         }
         })
+        nc.addObserver(forName: .rssiValueChanged,
+                       object: nil,
+                       queue: OperationQueue.main,
+                       using: { notification in
+                        if let payload = notification.object as? RssiValueChangedPayload {
+                            self.rssiLabel.text = "\(payload.value)" + "dBm"
+                        }
+        })
+
     }
 
 }

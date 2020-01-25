@@ -443,6 +443,7 @@ internal final class Model {
                     case .offLine:
                         break
                     case .ready:
+                        self.getRssi()
                         self.rgb.get()
 //                        self.redLed.get()
 //                        self.greenLed.get()
@@ -450,7 +451,6 @@ internal final class Model {
 //                        self.rightButton.get()
 //                        self.leftButton.setNotify(state: true)
 //                        self.rightButton.setNotify(state: true)
-//                        self.getRssi()
                 }
             }})
         
