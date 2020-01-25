@@ -18,6 +18,8 @@ internal let kEntityGreenLed        = "greenled"
 internal let kEntityLeftButton      = "leftbutton"
 internal let kEntityRightButton     = "rightbutton"
 internal let kEntityRSSI            = "rssi"        // NOTE: Not a real entity
+internal let kEntityLssOffOn        = "lssoffon"
+internal let kEntityLssRgb          = "lssrgb"
 
 //
 // Publication topics
@@ -28,6 +30,8 @@ public extension Notification.Name {
     static let entityLeftButton = Notification.Name(kEntityLeftButton)
     static let entityRightButton = Notification.Name(kEntityRightButton)
     static let entityRSSI = Notification.Name(kEntityRSSI)
+    static let entityLssOffOn = Notification.Name(kEntityLssOffOn)
+    static let entityLssRgb = Notification.Name(kEntityLssRgb)
 }
 
 //
@@ -40,6 +44,24 @@ internal struct BinaryPayload {
 
 internal struct IntegerPayload {
     var value: Int
+    var isNotifying: Bool
+    var didWrite: Bool
+}
+
+internal struct Rgb {
+    var red: Float
+    var green: Float
+    var blue: Float
+
+    init(red: Float, green: Float, blue: Float) {
+        self.red = red
+        self.green = green
+        self.blue = blue
+    }
+}
+
+internal struct RgbPayload {
+    var rgb: Rgb
     var isNotifying: Bool
     var didWrite: Bool
 }
@@ -61,6 +83,20 @@ fileprivate let greenLedShortUuid       = "1112"
 fileprivate let buttonServiceShortUuid  = "1120"
 fileprivate let leftButtonShortUuid     = "1121"
 fileprivate let rightButtonShortUuid    = "1122"
+//
+// IOTCourse UUID’s
+//
+fileprivate let iotBaseUuid             = "775e0000-8aa0-40f6-b037-ea770326e665"
+// Led String Service
+fileprivate let lssServiceShortUuid     = "0100"
+fileprivate let offOnShortUuid          = "0101"
+fileprivate let rgbShortUuid            = "0102"
+//
+fileprivate let alsServiceShortUuid     = "0200"
+fileprivate let luminShortUuid          = "0201"
+fileprivate let threshShortUuid         = "0202"
+fileprivate let hystShortUuid           = "0203"
+fileprivate let lmOffOnShortUuid        = "0204"
 
 //
 // CBUUIDs
@@ -72,8 +108,20 @@ fileprivate let greenLedUuid = CBUUID(baseUuid: tiBaseUuid, shortUuid: greenLedS
 fileprivate let buttonServiceUuid = CBUUID(baseUuid: tiBaseUuid, shortUuid: buttonServiceShortUuid)
 fileprivate let leftButtonUuid = CBUUID(baseUuid: tiBaseUuid, shortUuid: leftButtonShortUuid)
 fileprivate let rightButtonUuid = CBUUID(baseUuid: tiBaseUuid, shortUuid: rightButtonShortUuid)
-
-fileprivate let defaultService = ledServiceUuid
+//
+// LSS Service
+fileprivate let lssServiceUuid = CBUUID(baseUuid: iotBaseUuid, shortUuid: lssServiceShortUuid)
+fileprivate let lssOffOnUuid = CBUUID(baseUuid: iotBaseUuid, shortUuid: offOnShortUuid)
+fileprivate let lssRgbUuid = CBUUID(baseUuid: iotBaseUuid, shortUuid: rgbShortUuid)
+//
+// ALS Service
+fileprivate let alsServiceUuid = CBUUID(baseUuid: iotBaseUuid, shortUuid: alsServiceShortUuid)
+fileprivate let alsLuminUuid = CBUUID(baseUuid: iotBaseUuid, shortUuid: luminShortUuid)
+fileprivate let alsThreshUuid = CBUUID(baseUuid: iotBaseUuid, shortUuid: threshShortUuid)
+fileprivate let alsHystUuid = CBUUID(baseUuid: iotBaseUuid, shortUuid: hystShortUuid)
+fileprivate let alsLmOffOnUuid = CBUUID(baseUuid: iotBaseUuid, shortUuid: lmOffOnShortUuid)
+//
+fileprivate let defaultService = lssServiceUuid
 
 //
 // Entity definitions
@@ -198,11 +246,109 @@ fileprivate class BinaryEntity: Entity {
     
 }
 
+internal struct BleRgb: ExpressibleByIntegerLiteral {
+    typealias IntegerLiteralType = Int
+    
+    var red: UInt8
+    var green: UInt8
+    var blue: UInt8
+    
+    init(integerLiteral hexRgb: IntegerLiteralType) {
+        self.init(red: UInt8(hexRgb & 0x0000FF),
+                  green: UInt8((hexRgb & 0x00FF00) >> 8),
+                  blue: UInt8((hexRgb & 0xFF0000) >> 16))
+    }
+    
+    init(red: UInt8, green: UInt8, blue: UInt8) {
+        self.red = red
+        self.green = green
+        self.blue = blue
+    }
+}
+
+fileprivate class RgbEntity: Entity {
+    typealias T = Rgb
+    typealias U = BleRgb
+    
+    let name: String
+    let topic: Notification.Name
+    var isNotifying: Bool = false
+    var didWrite: Bool = false
+    let suuid: CBUUID
+    let cuuid: CBUUID
+    let permission: UInt8
+    let bleService: BleService
+    let nc: NotificationCenter = NotificationCenter.default
+    var value: T
+    var bleValue: U
+
+    init(name: String, topic: Notification.Name, suuid: CBUUID, cuuid: CBUUID, permission: UInt8, bleService: BleService, defaultValue: T) {
+        self.name = name
+        self.topic = topic
+        self.suuid = suuid
+        self.cuuid = cuuid
+        self.permission = permission
+        self.bleService = bleService
+        self.value = defaultValue
+        self.bleValue = BleRgb.init(red: UInt8(defaultValue.red) * UInt8.max,
+                                    green: UInt8(defaultValue.green) * UInt8.max,
+                                    blue: UInt8(defaultValue.blue) * UInt8.max)
+    }
+    
+    // Client inbound
+    func set(value: T, response: Bool) {
+        guard (permission & kPermitWrite) == kPermitWrite else { return}
+        
+        self.value = value
+        bleValue.red = UInt8(value.red * Float(UInt8.max))
+        bleValue.green = UInt8(value.green * Float(UInt8.max))
+        bleValue.blue = UInt8(value.blue * Float(UInt8.max))
+        bleService.write(suuid: suuid,
+                         cuuid: cuuid,
+                         data: withUnsafeBytes(of: &bleValue, { Data($0) }),
+                         response: response)
+        if response == false {
+            publish()
+        }
+    }
+    
+    // Ble inbound
+    func valueChanged(data: Data) {
+        guard let result = data.to(type: BleRgb.self) else {
+            os_log("ERROR: converting data", log: Log.model, type: .error)
+            return
+        }
+        
+        bleValue = result
+        value.red = Float(bleValue.red) / Float(UInt8.max)
+        value.green = Float(bleValue.green) / Float(UInt8.max)
+        value.blue = Float(bleValue.blue) / Float(UInt8.max)
+        publish()
+    }
+    
+    // Publication
+    func publish() {
+        nc.post(name: topic,
+                object: RgbPayload(rgb: value,
+                                   isNotifying: isNotifying,
+                                   didWrite: didWrite))
+    }
+
+}
+
 //
 // Entity Types
 fileprivate enum EntityType {
     case binary(BinaryEntity)
+    case rgb(RgbEntity)
 }
+
+//
+// Valid Model Entity value types
+protocol EntityValue {}
+
+extension Bool: EntityValue {}
+extension Rgb: EntityValue {}
 
 // MARK: - Model class
 //
@@ -215,6 +361,8 @@ internal final class Model {
     private let greenLed: BinaryEntity
     private let leftButton: BinaryEntity
     private let rightButton: BinaryEntity
+    private let offOn: BinaryEntity
+    private let rgb: RgbEntity
     private let lookUpByEntity: [String : EntityType]
     private let lookUpByCharac: [CBUUID : EntityType]
 
@@ -249,16 +397,33 @@ internal final class Model {
                                    permission: kPermitRead | kPermitNotify,
                                    bleService: bleService,
                                    defaultValue: false)
+        rgb = RgbEntity(name: kEntityLssRgb,
+                        topic: .entityLssRgb,
+                        suuid: lssServiceUuid,
+                        cuuid: lssRgbUuid,
+                        permission: kPermitRead | kPermitWrite,
+                        bleService: bleService,
+                        defaultValue: Rgb(red: 0.0, green: 0.0, blue: 0.0))
+        offOn = BinaryEntity(name: kEntityLssOffOn,
+                             topic: .entityLssOffOn,
+                             suuid: lssServiceUuid,
+                             cuuid: lssOffOnUuid,
+                             permission: kPermitRead | kPermitWrite,
+                             bleService: bleService,
+                             defaultValue: false)
         lookUpByEntity = [kEntityRedLed : .binary(redLed),
                           kEntityGreenLed : .binary(greenLed),
                           kEntityLeftButton : .binary(leftButton),
-                          kEntityRightButton : .binary(rightButton)
+                          kEntityRightButton : .binary(rightButton),
+                          kEntityLssRgb : .rgb(rgb),
+                          kEntityLssOffOn : .binary(offOn)
         ]
         lookUpByCharac = [redLedUuid : .binary(redLed),
                           greenLedUuid : .binary(greenLed),
                           leftButtonUuid : .binary(leftButton),
-                          rightButtonUuid : .binary(rightButton)
-
+                          rightButtonUuid : .binary(rightButton),
+                          lssRgbUuid : .rgb(rgb),
+                          lssOffOnUuid : .binary(offOn)
         ]
         setupSubscriptions()
     }
@@ -295,6 +460,8 @@ internal final class Model {
                 switch thisEntity {
                 case .binary(var bin):
                     bin.writeConfirm()
+                case .rgb(var rgb):
+                    rgb.writeConfirm()
                 }
             }})
         // Charac notification state
@@ -307,6 +474,8 @@ internal final class Model {
                             switch thisEntity {
                             case .binary(var bin):
                                 bin.notifyStateChanged(state: payload.state)
+                            case .rgb(_):
+                                break       // Not meaningful for rgb
                             }
                         }
         })
@@ -320,6 +489,8 @@ internal final class Model {
                             switch thisEntity {
                             case .binary(let bin):
                                 bin.valueChanged(data: payload.data)
+                            case .rgb(let rgb):
+                                rgb.valueChanged(data: payload.data)
                             }
                         }
         })
@@ -347,15 +518,21 @@ internal final class Model {
         switch thisEntity {
         case .binary(let bin):
             bin.get()
+        case .rgb(let rgb):
+            rgb.get()
         }
     }
     
-    func set(entity: String, value: Bool, response: Bool) {
+    func set(entity: String, value: EntityValue, response: Bool) {
         guard let thisEntity = lookUpByEntity[entity], bleStatus == .ready else { return }
 
         switch thisEntity {
         case .binary(let bin):
-            bin.set(value: value, response: response)
+            guard let val = value as? Bool else { return }
+            bin.set(value: val, response: response)
+        case .rgb(let rgb):
+            guard let val = value as? Rgb else { return }
+            rgb.set(value: val, response: response)
         }
     }
     
@@ -365,6 +542,8 @@ internal final class Model {
         switch thisEntity {
         case .binary(let bin):
             bin.setNotify(state: state)
+        case .rgb(_):
+            break       // Not meaningful for rgb
         }
     }
     
