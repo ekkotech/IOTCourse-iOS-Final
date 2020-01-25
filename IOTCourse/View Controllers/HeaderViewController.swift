@@ -32,6 +32,7 @@ class HeaderViewController: UIViewController {
         }
 
         setupControls()
+        setupSubscriptions()
     }
     
 
@@ -45,6 +46,36 @@ class HeaderViewController: UIViewController {
         offOnButton.setImage(UIImage(named: "lampOn"), for: .selected)
         offOnButton.setImage(UIImage(named: "lampOff"), for: .normal)
 
+    }
+
+    private func setupSubscriptions() {
+        nc.addObserver(forName: .bleStatus,
+                       object: nil,
+                       queue: OperationQueue.main,
+                       using: { notification in
+                        if let payload = notification.object as? BleStatusPayload {
+                            if payload.status == .ready {
+                                self.connectStatusImage.image = UIImage(named: notConnectedImageName)
+                            }
+                            else {
+                                self.connectStatusImage.image = UIImage(named: notAttachedImageName)
+                            }
+                            self.rssiLabel.text = "---"
+                        }
+        })
+        nc.addObserver(forName: .connectStatus,
+                       object: nil,
+                       queue: OperationQueue.main,
+                       using: { notification in
+                            if let payload = notification.object as? ConnectStatusPayload {
+                                if payload.status == .connected {
+                                    self.connectStatusImage.image = UIImage(named: connectedImageName)
+                                }
+                                else if payload.status == .disconnected {
+                                    self.connectStatusImage.image = UIImage(named: notConnectedImageName)
+                                }
+                        }
+        })
     }
 
 }

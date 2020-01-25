@@ -20,6 +20,7 @@ public extension Notification.Name {
     static let characNotifyStateChanged = Notification.Name("characNotifyStateChanged")
     static let characValueChanged = Notification.Name("characValueChanged")
     static let rssiValueChanged = Notification.Name("rssiValueChanged")
+    static let connectStatus = Notification.Name("connectStatus")
 }
 
 //
@@ -37,6 +38,18 @@ internal enum BleStatus: CustomStringConvertible {
         case .ready: return "ready"
         }
     }
+}
+
+//
+// Connection status
+//
+internal enum ConnectStatus {
+    case connected
+    case disconnected
+}
+
+internal struct ConnectStatusPayload {
+    var status: ConnectStatus
 }
 
 //
@@ -472,6 +485,9 @@ extension BleService: CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         os_log("In didConnect: %s", log: Log.ble, type: .info, peripheral.identifier.uuidString)
 
+        nc.post(name: .connectStatus,
+                object: ConnectStatusPayload(status: .connected))
+
         let timeout: TimeInterval
         if case BleCommand.readRSSI = activeCommand.command { timeout = readRSSITimeout }
         else { timeout = connectionTimeout }
@@ -490,13 +506,17 @@ extension BleService: CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         os_log("In didFailToConnect: %s", log: Log.ble, type: .info, peripheral.identifier.uuidString)
 
+        nc.post(name: .connectStatus, object: ConnectStatusPayload(status: .disconnected))
+
         cmdQueue.async { self.handleEvent(event: .ConnectFail) }
         
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         os_log("In didFailToConnect: %s", log: Log.ble, type: .info, peripheral.identifier.uuidString)
-        
+
+        nc.post(name: .connectStatus, object: ConnectStatusPayload(status: .disconnected))
+
         if error == nil {
             // Intentional disconnect
             cmdQueue.async { self.handleEvent(event: .Disconnected) }
