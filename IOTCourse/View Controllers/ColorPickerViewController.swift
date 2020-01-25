@@ -23,9 +23,16 @@ class ColorPickerViewController: UIViewController {
         }
 
         sliderPicker.addTarget(self, action: #selector(handleSliderValueChange), for: .valueChanged)
+        radialPicker.addTarget(self, action: #selector(handleRadialValueChange), for: .valueChanged)
     }
 
     @objc private func handleSliderValueChange(sender: RGBColorPicker) {
+        radialPicker.value = sender.value
+        sliderPicker.value = sender.value
+    }
+
+    @objc func handleRadialValueChange(sender: HSBColorPicker) {
+        radialPicker.value = sender.value
         sliderPicker.value = sender.value
     }
 

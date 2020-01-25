@@ -36,6 +36,9 @@ class HSBColorPicker: UIControl {
         }
         set {
             _value = newValue
+            setThumbPosition(value: newValue)
+            thumbTack.color = newValue
+            sliderView.value = newValue
         }
     }
 
@@ -107,19 +110,30 @@ class HSBColorPicker: UIControl {
     @objc func handleCircleTap(_ sender: UITapGestureRecognizer) {
 
         if sender.state == .ended {
-
+            if let v = valueForBoundedLocation(location: sender.location(in: self),
+                                               relativeTo: circleView.center,
+                                               bounds: radius + gutter) {
+                _value = v
+                sendActions(for: .valueChanged)
+            }
         }
     }
 
     @objc func handleCirclePan(_ sender: UIPanGestureRecognizer) {
 
         if sender.state == .began || sender.state == .changed || sender.state == .ended {
-
+            if let v = valueForBoundedLocation(location: sender.location(in: self),
+                                               relativeTo: circleView.center,
+                                               bounds: radius + gutter) {
+                _value = v
+                sendActions(for: .valueChanged)
+            }
         }
     }
 
     @objc func handleSliderValueChanged(_ sender: ColorSlider) {
-
+        _value = sender.value
+        sendActions(for: .valueChanged)
     }
 
     // MARK: - Private functions
@@ -138,16 +152,26 @@ class HSBColorPicker: UIControl {
     private func valueForBoundedLocation(location: CGPoint, relativeTo: CGPoint, bounds: CGFloat) -> UIColor? {
 
         /// Location relative to circle center; traditional cartesian corodinates
+        let rl = CGPoint(x: location.x - relativeTo.x, y: -(location.y - relativeTo.y))
 
-        /// Normalise saturation
-
-        /// Normalise hue; anti-clockwise direction
-
-        /// Filter out possible -0.0 values
-
-        /// Return new color
-
-        return nil
+        let displacement = sqrt((rl.x * rl.x) + (rl.y * rl.y))
+        if displacement <= bounds {
+            /// Normalise saturation
+            let saturation = displacement > radius ? 1.0 : (displacement / radius)
+            let rads = CGFloat(atan2f(Float(rl.y), Float(rl.x)))
+            /// Normalise hue; anti-clockwise direction
+            var hue = rads < 0 ? 1.0 + (rads / (2 * .pi)) : (rads / (2 * .pi))
+            /// Filter out possible -0.0 values
+            hue = hue == -0.0 ? 0.0 : hue
+            /// Return new color
+            return UIColor(hue: hue,
+                           saturation: saturation,
+                           brightness: sliderView.value.hsba.brightness,
+                           alpha: 1.0)
+        }
+        else {
+            return nil
+        }
 
     }
 
@@ -178,8 +202,13 @@ class HSBColorPicker: UIControl {
 
      */
     private func setThumbPosition(value: UIColor) {
-
-
+        /// Angular displacement in radians
+        let theta = value.hsba.hue * (2 * .pi)
+        /// Displacement from circle center
+        let hypot = value.hsba.saturation * radius
+        /// Thumb tack location
+        thumbTack.center = CGPoint(x: (hypot * cos(theta)) + circleView.bounds.width / 2.0,
+                                   y: circleView.bounds.height / 2.0 - (hypot * sin(theta)))
     }
 
 }
