@@ -443,13 +443,14 @@ internal final class Model {
                     case .offLine:
                         break
                     case .ready:
-                        self.redLed.get()
-                        self.greenLed.get()
-                        self.leftButton.get()
-                        self.rightButton.get()
-                        self.leftButton.setNotify(state: true)
-                        self.rightButton.setNotify(state: true)
-                        self.getRssi()
+                        self.rgb.get()
+//                        self.redLed.get()
+//                        self.greenLed.get()
+//                        self.leftButton.get()
+//                        self.rightButton.get()
+//                        self.leftButton.setNotify(state: true)
+//                        self.rightButton.setNotify(state: true)
+//                        self.getRssi()
                 }
             }})
         

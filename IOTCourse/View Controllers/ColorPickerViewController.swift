@@ -24,16 +24,45 @@ class ColorPickerViewController: UIViewController {
 
         sliderPicker.addTarget(self, action: #selector(handleSliderValueChange), for: .valueChanged)
         radialPicker.addTarget(self, action: #selector(handleRadialValueChange), for: .valueChanged)
+        
+        setupSubscriptions()
+    }
+
+    // MARK: - Private functions
+    //
+    private func setupSubscriptions() {
+        
+        nc.addObserver(forName: .entityLssRgb,
+                       object: nil,
+                       queue: OperationQueue.main,
+                       using: {notification in
+                        if let payload = notification.object as? RgbPayload {
+                            let newColor = UIColor(red: CGFloat(payload.rgb.red),
+                                                   green: CGFloat(payload.rgb.green),
+                                                   blue: CGFloat(payload.rgb.blue),
+                                                   alpha: 1.0)
+                            self.sliderPicker.value = newColor
+                            self.radialPicker.value = newColor
+                        }
+        })
+
     }
 
     @objc private func handleSliderValueChange(sender: RGBColorPicker) {
-        radialPicker.value = sender.value
-        sliderPicker.value = sender.value
+        updateModel(color: sender.value)
     }
 
-    @objc func handleRadialValueChange(sender: HSBColorPicker) {
-        radialPicker.value = sender.value
-        sliderPicker.value = sender.value
+    @objc private func handleRadialValueChange(sender: HSBColorPicker) {
+        updateModel(color: sender.value)
+    }
+
+    private func updateModel(color: UIColor) {
+        if let md = model {
+            md.set(entity: kEntityLssRgb, value: Rgb(red: Float(color.rgba.red),
+                                                     green: Float(color.rgba.green),
+                                                     blue: Float(color.rgba.blue)),
+                   response: false)
+        }
     }
 
 }
