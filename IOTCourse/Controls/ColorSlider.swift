@@ -39,6 +39,7 @@ class ColorSlider: UIControl {
     private var startColor: UIColor = UIColor.black
     private var endColor: UIColor = UIColor.white
     private var activeFrame: CGRect = CGRect.zero
+    private var thumbTack: ThumbTack = ThumbTack()
     //
     // Backing vars
     private var _value: UIColor = defaultColor
@@ -94,6 +95,7 @@ class ColorSlider: UIControl {
 
     private func commonInit() {
         self.layer.addSublayer(trackLayer)
+        self.addSubview(thumbTack)
     }
 
     // MARK: - Rendering
@@ -142,6 +144,8 @@ class ColorSlider: UIControl {
                              y: trackLayer.frame.origin.y,
                              width: trackLayer.frame.width - (2 * trackLayer.cornerRadius),
                              height: trackLayer.frame.height)
+        thumbTack.diameter = (layer.frame.height * defaultThumbHeightRatio).rounded(.down)
+        updateThumbTack(thumb: thumbTack, color: value, channel: channel)
     }
 
     // MARK: - Action Handlers
@@ -181,8 +185,8 @@ class ColorSlider: UIControl {
 
     */
     private func locationForPosition(position: CGFloat) -> CGPoint {
-
-        return CGPoint.zero
+        return CGPoint(x: activeFrame.origin.x + (activeFrame.width * position),
+                       y: activeFrame.origin.y + (activeFrame.height / 2.0))
     }
 
     /**
@@ -195,6 +199,30 @@ class ColorSlider: UIControl {
     */
     private func updateThumbTack(thumb: ThumbTack, color: UIColor, channel: ColorChannel) {
 
+        var loc: CGPoint
+
+        switch channel {
+        case .red:
+            loc = locationForPosition(position: color.rgba.red)
+        case .green:
+            loc = locationForPosition(position: color.rgba.green)
+        case .blue:
+            loc = locationForPosition(position: color.rgba.blue)
+        case .mono:
+            loc = locationForPosition(position: color.hsba.brightness)
+        }
+
+        // Update the location
+        thumb.center = loc
+
+        // Update the color
+        if channel != .mono {
+            thumb.color = color
+        }
+        else {
+            let bright = color.hsba.brightness
+            thumb.color = UIColor(red: bright, green: bright, blue: bright, alpha: 1.0)
+        }
     }
 
 }

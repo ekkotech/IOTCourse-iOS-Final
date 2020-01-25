@@ -76,7 +76,7 @@
                                         <integer key="value" value="0"/>
                                     </userDefinedRuntimeAttribute>
                                     <userDefinedRuntimeAttribute type="color" keyPath="value">
-                                        <color key="value" red="0.8652343750123288" green="0.64217679794520544" blue="0.5215378852739726" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                        <color key="value" red="0.75294306508082198" green="0.85137521404109584" blue="0.8809663955479452" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                     </userDefinedRuntimeAttribute>
                                     <userDefinedRuntimeAttribute type="boolean" keyPath="roundedEnd" value="YES"/>
                                     <userDefinedRuntimeAttribute type="number" keyPath="cornerRadius">
