@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D140483D23DD658400F38968 /* TabBarViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D140483C23DD658400F38968 /* TabBarViewController.swift */; };
 		D1D30D0123DBDCFC00982A0B /* HeaderViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1D30D0023DBDCFC00982A0B /* HeaderViewController.swift */; };
 		D1D30D0323DBDD0D00982A0B /* ColorPickerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1D30D0223DBDD0D00982A0B /* ColorPickerViewController.swift */; };
 		D1D30D0523DBDDD900982A0B /* HSBColorPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1D30D0423DBDDD900982A0B /* HSBColorPicker.swift */; };
@@ -52,6 +53,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		D140483C23DD658400F38968 /* TabBarViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarViewController.swift; sourceTree = "<group>"; };
 		D1D30D0023DBDCFC00982A0B /* HeaderViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeaderViewController.swift; sourceTree = "<group>"; };
 		D1D30D0223DBDD0D00982A0B /* ColorPickerViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorPickerViewController.swift; sourceTree = "<group>"; };
 		D1D30D0423DBDDD900982A0B /* HSBColorPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HSBColorPicker.swift; sourceTree = "<group>"; };
@@ -117,6 +119,7 @@
 				D1D30D0023DBDCFC00982A0B /* HeaderViewController.swift */,
 				D1D30D0223DBDD0D00982A0B /* ColorPickerViewController.swift */,
 				D1D30D0D23DBF4F100982A0B /* Page2ViewController.swift */,
+				D140483C23DD658400F38968 /* TabBarViewController.swift */,
 			);
 			path = "View Controllers";
 			sourceTree = "<group>";
@@ -354,6 +357,7 @@
 				D1D30D0123DBDCFC00982A0B /* HeaderViewController.swift in Sources */,
 				D1D30D0C23DBE7C400982A0B /* ColorSlider.swift in Sources */,
 				D1F9D35623D826C000A1D93E /* Log.swift in Sources */,
+				D140483D23DD658400F38968 /* TabBarViewController.swift in Sources */,
 				D1F9D35523D826C000A1D93E /* CoreBluetooth.swift in Sources */,
 				D1F9D35C23D8291300A1D93E /* BleService.swift in Sources */,
 				D1D30D0323DBDD0D00982A0B /* ColorPickerViewController.swift in Sources */,
