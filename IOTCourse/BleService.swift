@@ -145,6 +145,7 @@ internal final class BleService: NSObject {
     //
     private var attachingWith: (peripheral: CBPeripheral?, suuid: CBUUID?, isAttached: Bool) = (nil, nil, false)
     private var activeCommand = ActiveCommand()
+    private var activeNotifications: [CBUUID : CBUUID] = [:]
 
     init(defaults: UserDefaults = UserDefaults.standard) {
         ud = defaults
@@ -244,6 +245,20 @@ internal final class BleService: NSObject {
         }
     }
 
+    private func reestablishNotifications() {
+        if let per = attachingWith.peripheral, per.state != .connected {
+            activeNotifications.forEach { noti in
+                opQueue.addOperation(AppOperation(queue: cmdQueue,
+                                                  dispatchBlock: {
+                                                    self.activeCommand = ActiveCommand(suuid: noti.key,
+                                                                                       cuuid: noti.value,
+                                                                                       command: .setNotify(true))
+                                                    self.cmdQueue.async { self.handleEvent(event: .SetNotify) }
+                }))
+            }
+        }
+    }
+
     // MARK: - Public (Internal) API
     //
     func attachPeripheral(suuid: CBUUID, forceScan: Bool = false) {
@@ -253,6 +268,7 @@ internal final class BleService: NSObject {
     }
     
     func read(suuid: CBUUID, cuuid: CBUUID) {
+        reestablishNotifications()
         opQueue.addOperation(AppOperation(queue: cmdQueue,
                                           dispatchBlock: {
                                             self.activeCommand = ActiveCommand(suuid: suuid,
@@ -263,6 +279,7 @@ internal final class BleService: NSObject {
     }
     
     func write(suuid: CBUUID, cuuid: CBUUID, data: Data, response: Bool) {
+        reestablishNotifications()
         opQueue.addOperation(AppOperation(queue: cmdQueue,
                                           dispatchBlock: {
                                             self.activeCommand = ActiveCommand(suuid: suuid,
@@ -273,6 +290,9 @@ internal final class BleService: NSObject {
     }
     
     func setNotify(suuid: CBUUID, cuuid: CBUUID, state: Bool) {
+        if state { activeNotifications[suuid] = cuuid }
+        else { activeNotifications.removeValue(forKey: suuid)}
+
         opQueue.addOperation(AppOperation(queue: cmdQueue,
                                           dispatchBlock: {
                                             self.activeCommand = ActiveCommand(suuid: suuid,
@@ -581,6 +601,11 @@ extension BleService: CBPeripheralDelegate {
                 object: CharacNotifyStateChangedPayload(charac: characteristic.uuid,
                                                         state: characteristic.isNotifying))
 
+        if let cval = characteristic.value {
+            nc.post(name: .characValueChanged,
+                    object: CharacValueChangedPayload(charac: characteristic.uuid,
+                                                      data: cval))
+        }
     }
     
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
