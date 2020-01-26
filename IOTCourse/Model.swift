@@ -534,6 +534,7 @@ protocol EntityValue {}
 
 extension Bool: EntityValue {}
 extension Rgb: EntityValue {}
+extension Int: EntityValue {}
 
 // MARK: - Model class
 //
@@ -685,6 +686,9 @@ internal final class Model {
                         self.offOn.get()
                         self.lumin.get()
                         self.lumin.setNotify(state: true)
+                        self.thresh.get()
+                        self.hyst.get()
+                        self.lmOffOn.get()
 //                        self.redLed.get()
 //                        self.greenLed.get()
 //                        self.leftButton.get()

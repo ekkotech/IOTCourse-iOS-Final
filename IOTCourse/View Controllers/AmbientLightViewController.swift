@@ -75,7 +75,38 @@ class AmbientLightViewController: UIViewController {
     }
 
     private func setupSubscriptions() {
-
+        nc.addObserver(forName: .entityAlsThresh,
+                       object: nil,
+                       queue: OperationQueue.main,
+                       using: { notification in
+                        if let payload = notification.object as? IntegerPayload {
+                            self.thresholdPicker.selectRow(payload.value - alsThreshMinValue,
+                                                            inComponent: 0,
+                                                            animated: true)
+                            self.disableButtons(buttons: [self.applyButton, self.cancelButton])
+                        }
+        })
+        nc.addObserver(forName: .entityAlsHyst,
+                       object: nil,
+                       queue: OperationQueue.main,
+                       using: { notification in
+                        if let payload = notification.object as? IntegerPayload {
+                            self.hysteresisPicker.selectRow(payload.value - alsHystMinValue,
+                                                            inComponent: 0,
+                                                            animated: true)
+                            self.disableButtons(buttons: [self.applyButton, self.cancelButton])
+                        }
+        })
+        nc.addObserver(forName: .entityAlsOffOn,
+                       object: nil,
+                       queue: OperationQueue.main,
+                       using: {notification in
+                        if let payload = notification.object as? BinaryPayload {
+                            self.offOnSwitch.isOn = payload.value
+                            self.thresholdPicker.isUserInteractionEnabled = payload.value
+                            self.hysteresisPicker.isUserInteractionEnabled = payload.value
+                        }
+        })
     }
 
     private func enableButtons(buttons: [UIButton]) {
@@ -106,8 +137,16 @@ class AmbientLightViewController: UIViewController {
     // MARK: - UI Action Handlers
     //
     @IBAction func applyButtonTouchUpInside(_ sender: UIButton) {
-        disableButtons(buttons: [applyButton, cancelButton])
-        priorState = (0, 0)
+        if let md = model {
+            md.set(entity: kEntityAlsThresh,
+                   value: thresholdPicker.selectedRow(inComponent: 0) + alsThreshMinValue,
+                   response: false)
+            md.set(entity: kEntityAlsHyst,
+                   value: hysteresisPicker.selectedRow(inComponent: 0) + alsHystMinValue,
+                   response: false)
+            disableButtons(buttons: [applyButton, cancelButton])
+            priorState = (0, 0)
+        }
     }
 
     @IBAction func cancelButtonTouchUpInside(_ sender: UIButton) {
@@ -117,8 +156,9 @@ class AmbientLightViewController: UIViewController {
     }
 
     @IBAction func offOnSwitchValueChanged(_ sender: UISwitch) {
-        thresholdPicker.isUserInteractionEnabled = sender.isOn
-        hysteresisPicker.isUserInteractionEnabled = sender.isOn
+        if let md = model {
+            md.set(entity: kEntityAlsOffOn, value: sender.isOn, response: false)
+        }
     }
 
 }
