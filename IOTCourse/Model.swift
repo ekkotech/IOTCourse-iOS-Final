@@ -683,6 +683,8 @@ internal final class Model {
                         self.getRssi()
                         self.rgb.get()
                         self.offOn.get()
+                        self.lumin.get()
+                        self.lumin.setNotify(state: true)
 //                        self.redLed.get()
 //                        self.greenLed.get()
 //                        self.leftButton.get()

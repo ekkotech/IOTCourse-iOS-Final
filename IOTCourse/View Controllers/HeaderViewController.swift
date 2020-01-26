@@ -21,6 +21,7 @@ class HeaderViewController: UIViewController {
     @IBOutlet weak var rssiLabel: UILabel!
     @IBOutlet weak var offOnButton: UIButton!
     @IBOutlet weak var moreButton: UIButton!
+    @IBOutlet weak var luminLabel: UILabel!
     
     var model: Model?
 
@@ -90,6 +91,14 @@ class HeaderViewController: UIViewController {
                        using: { notification in
                         if let payload = notification.object as? BinaryPayload {
                             self.offOnButton.isSelected = payload.value
+                        }
+        })
+        nc.addObserver(forName: .entityAlsLumin,
+                       object: nil,
+                       queue: OperationQueue.main,
+                       using: { notification in
+                        if let payload = notification.object as? IntegerPayload {
+                            self.luminLabel.text = "\(payload.value)"
                         }
         })
 

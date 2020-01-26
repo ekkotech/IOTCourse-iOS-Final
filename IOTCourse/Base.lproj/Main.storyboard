@@ -191,7 +191,7 @@
                                 </connections>
                             </button>
                             <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="---" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="vEB-Rs-LrR">
-                                <rect key="frame" x="72" y="11" width="42" height="18"/>
+                                <rect key="frame" x="72" y="11" width="21" height="18"/>
                                 <fontDescription key="fontDescription" type="system" pointSize="15"/>
                                 <color key="textColor" red="0.42745098040000001" green="0.42745098040000001" blue="0.42745098040000001" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                 <nil key="highlightedColor"/>
@@ -202,25 +202,56 @@
                                     <constraint firstAttribute="width" secondItem="4wa-ni-n1e" secondAttribute="height" multiplier="1:1" id="qDW-Q4-XyH"/>
                                 </constraints>
                             </imageView>
+                            <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="KRD-0P-kJo">
+                                <rect key="frame" x="185" y="0.0" width="65" height="40"/>
+                                <color key="backgroundColor" systemColor="systemBackgroundColor" cocoaTouchSystemColor="whiteColor"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" constant="65" id="yFf-df-LDL"/>
+                                </constraints>
+                            </view>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="sun" translatesAutoresizingMaskIntoConstraints="NO" id="7st-li-GTL">
+                                <rect key="frame" x="185" y="0.0" width="40" height="40"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" secondItem="7st-li-GTL" secondAttribute="height" multiplier="1:1" id="4Ig-UO-jeY"/>
+                                </constraints>
+                            </imageView>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="---" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="d7f-LU-82k">
+                                <rect key="frame" x="209" y="19" width="41" height="21"/>
+                                <color key="backgroundColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                <fontDescription key="fontDescription" type="system" pointSize="17"/>
+                                <color key="textColor" red="0.42745098040000001" green="0.42745098040000001" blue="0.42745098040000001" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                <nil key="highlightedColor"/>
+                            </label>
                         </subviews>
                         <color key="backgroundColor" systemColor="systemBackgroundColor" cocoaTouchSystemColor="whiteColor"/>
                         <constraints>
+                            <constraint firstItem="7st-li-GTL" firstAttribute="centerY" secondItem="KRD-0P-kJo" secondAttribute="centerY" id="7Jb-fb-pFr"/>
+                            <constraint firstItem="d7f-LU-82k" firstAttribute="leading" relation="lessThanOrEqual" secondItem="KRD-0P-kJo" secondAttribute="leading" constant="24" id="9P8-mY-xv5"/>
+                            <constraint firstItem="d7f-LU-82k" firstAttribute="trailing" secondItem="KRD-0P-kJo" secondAttribute="trailing" id="9pQ-sF-0Vu"/>
                             <constraint firstItem="4wa-ni-n1e" firstAttribute="centerY" secondItem="Y3m-RC-N3Q" secondAttribute="centerY" id="A2s-JG-gjS"/>
+                            <constraint firstItem="KRD-0P-kJo" firstAttribute="centerY" secondItem="Y3m-RC-N3Q" secondAttribute="centerY" id="Dnu-Gr-MwJ"/>
                             <constraint firstItem="4wa-ni-n1e" firstAttribute="leading" secondItem="Y3m-RC-N3Q" secondAttribute="leading" constant="16" id="Eez-Ug-enm"/>
                             <constraint firstItem="4no-lo-93m" firstAttribute="leading" secondItem="msH-Pl-f8V" secondAttribute="trailing" constant="20" id="JP5-j6-0Im"/>
+                            <constraint firstItem="msH-Pl-f8V" firstAttribute="leading" secondItem="KRD-0P-kJo" secondAttribute="trailing" constant="8" id="LhT-5q-7ac"/>
                             <constraint firstItem="4wa-ni-n1e" firstAttribute="height" secondItem="Y3m-RC-N3Q" secondAttribute="height" id="MXp-qj-zck"/>
-                            <constraint firstItem="msH-Pl-f8V" firstAttribute="leading" relation="lessThanOrEqual" secondItem="vEB-Rs-LrR" secondAttribute="trailing" constant="144" id="OD5-xy-xeb"/>
                             <constraint firstItem="msH-Pl-f8V" firstAttribute="centerY" secondItem="Y3m-RC-N3Q" secondAttribute="centerY" id="Rpj-qe-z9a"/>
                             <constraint firstItem="4no-lo-93m" firstAttribute="centerY" secondItem="Y3m-RC-N3Q" secondAttribute="centerY" id="SAe-Zl-trb"/>
+                            <constraint firstItem="KRD-0P-kJo" firstAttribute="height" secondItem="Y3m-RC-N3Q" secondAttribute="height" id="Y0h-Nf-afZ"/>
+                            <constraint firstItem="7st-li-GTL" firstAttribute="leading" secondItem="KRD-0P-kJo" secondAttribute="leading" id="faR-ts-hkK"/>
                             <constraint firstItem="vEB-Rs-LrR" firstAttribute="centerY" secondItem="Y3m-RC-N3Q" secondAttribute="centerY" id="giW-e5-Kg8"/>
                             <constraint firstItem="4no-lo-93m" firstAttribute="height" secondItem="Y3m-RC-N3Q" secondAttribute="height" id="gkL-1Y-FZc"/>
                             <constraint firstItem="msH-Pl-f8V" firstAttribute="height" secondItem="Y3m-RC-N3Q" secondAttribute="height" id="jyr-GU-OBa"/>
+                            <constraint firstItem="d7f-LU-82k" firstAttribute="bottom" secondItem="KRD-0P-kJo" secondAttribute="bottom" id="kY2-Az-THS"/>
                             <constraint firstAttribute="trailing" secondItem="4no-lo-93m" secondAttribute="trailing" constant="16" id="pjZ-CP-izp"/>
+                            <constraint firstItem="KRD-0P-kJo" firstAttribute="leading" relation="lessThanOrEqual" secondItem="vEB-Rs-LrR" secondAttribute="trailing" constant="92" id="rB2-qj-gBh"/>
                             <constraint firstItem="vEB-Rs-LrR" firstAttribute="leading" secondItem="4wa-ni-n1e" secondAttribute="trailing" constant="16" id="wUb-4J-iU0"/>
+                            <constraint firstItem="7st-li-GTL" firstAttribute="height" secondItem="KRD-0P-kJo" secondAttribute="height" id="wdL-QR-PHY"/>
                         </constraints>
+                        <viewLayoutGuide key="safeArea" id="4lP-6g-wRd"/>
                     </view>
                     <connections>
                         <outlet property="connectStatusImage" destination="4wa-ni-n1e" id="fb7-GF-VJg"/>
+                        <outlet property="luminLabel" destination="d7f-LU-82k" id="76J-WK-5w2"/>
                         <outlet property="moreButton" destination="4no-lo-93m" id="mOB-iY-E4m"/>
                         <outlet property="offOnButton" destination="msH-Pl-f8V" id="CzD-TP-XD3"/>
                         <outlet property="rssiLabel" destination="vEB-Rs-LrR" id="h1F-aB-km4"/>
@@ -235,5 +266,6 @@
         <image name="ellipsis" width="40" height="40"/>
         <image name="lampOff" width="30" height="30"/>
         <image name="notAttached" width="40" height="40"/>
+        <image name="sun" width="40" height="40"/>
     </resources>
 </document>
