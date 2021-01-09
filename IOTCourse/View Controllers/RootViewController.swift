@@ -7,12 +7,13 @@
 //
 
 import UIKit
+import os
 
 class RootViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-
+        os_log("RootViewController in viewDidLoad", log: Log.ui, type: .info)
     }
 
 }

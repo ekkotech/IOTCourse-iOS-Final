@@ -30,26 +30,32 @@ internal enum BleStatus: CustomStringConvertible {
     case onLine
     case offLine
     case ready
+    case scanning
+    case scanTimeout
+    case retrieving
+    case retrieveConnectFail
+    case scanSuccess
+    case retrieveSuccess
+    case connected
+    case disconnected
+    case disconnectWithError
     
     var description: String {
         switch self {
-        case .offLine: return "off-line"
-        case .onLine: return "on-line"
-        case .ready: return "ready"
+        case .onLine: return "Bluetooth is on-line"
+        case .offLine: return "Bluetooth is off-line"
+        case .ready: return "Bluetooth is ready"
+        case .scanning: return "Scanning..."
+        case .scanTimeout: return "Scan timed out"
+        case .retrieving: return "Retrieving..."
+        case .retrieveConnectFail: return "Retrieve connect failed"
+        case .scanSuccess: return "Discovered peripheral"
+        case .retrieveSuccess: return "Retrieved peripheral"
+        case .connected: return "Connected"
+        case .disconnected: return "Disconnected"
+        case .disconnectWithError: return "Disconnected with error"
         }
     }
-}
-
-//
-// Connection status
-//
-internal enum ConnectStatus {
-    case connected
-    case disconnected
-}
-
-internal struct ConnectStatusPayload {
-    var status: ConnectStatus
 }
 
 //
@@ -57,6 +63,7 @@ internal struct ConnectStatusPayload {
 //
 internal struct BleStatusPayload {
     var status: BleStatus
+    var info: String?
 }
 
 internal struct CharacWriteConfirmPayload {
@@ -141,7 +148,7 @@ internal final class BleService: NSObject {
     // TODO: state action map init - is an entry per state really needed? Can poss. init with [:]??
     private var stateActionMap: StateActionMap = Dictionary.init(uniqueKeysWithValues: BState.allCases.map { ($0, (nil, nil))})
     private var actionMap: ActionMap = Dictionary.init(uniqueKeysWithValues: BState.allCases.map { ($0, [:])})
-    private var errorMap: ErrorMap = Dictionary.init(uniqueKeysWithValues: BState.allCases.map { ($0, (nil, .Start))})
+    private var errorMap: ErrorMap = Dictionary.init(uniqueKeysWithValues: BState.allCases.map { ($0, (nil, .OnLine))})
     //
     private var attachingWith: (peripheral: CBPeripheral?, suuid: CBUUID?, isAttached: Bool) = (nil, nil, false)
     private var activeCommand = ActiveCommand()
@@ -157,6 +164,7 @@ internal final class BleService: NSObject {
                                                                qos: .userInitiated),
                                           options: initOptions)
         opQueue.maxConcurrentOperationCount = 1     // Serial queue
+        os_log("BleService initialised", log: Log.ble, type: .info)
     }
 
     // MARK: - Private functions
@@ -164,64 +172,75 @@ internal final class BleService: NSObject {
     private func setupStateMaps() {
         
         // State action map
-        stateActionMap[.Start] = (onEntry: performReset, onExit: nil)
+        stateActionMap[.OnLine] = (onEntry: performReset, onExit: nil)
+        stateActionMap[.OffLine] = (onEntry: performReset, onExit: nil)
         stateActionMap[.Scanning] = (onEntry: performScan, onExit: nil)
         stateActionMap[.Retrieving] = (onEntry: performRetrieve, onExit: nil)
         stateActionMap[.Ready] = (onEntry: performStageOperation, onExit: nil)
+        stateActionMap[.RWNotify] = (onEntry: performConnect, onExit: nil)
+        stateActionMap[.ReadRSSI] = (onEntry: performConnect, onExit: nil)
         
         // Action map
-        actionMap[.Start]?[.Scan] = (action: performNullAction, nextState: .Scanning)
-        actionMap[.Start]?[.Retrieve] = (action: performNullAction, nextState: .Retrieving)
-        actionMap[.Start]?[.OffLine] = (action: performNullAction, nextState: nil)
+        actionMap[.OnLine]?[.OnLine] = (action: [performNotifyOnLine], nextState: nil)
+        actionMap[.OnLine]?[.Scan] = (action: [performNotifyScanning], nextState: .Scanning)
+        actionMap[.OnLine]?[.Retrieve] = (action: [performNotifyRetrieving], nextState: .Retrieving)
+        actionMap[.OnLine]?[.OffLine] = (action: [performNotifyOffLine], nextState: .OffLine)
         //
-        actionMap[.Scanning]?[.ScanSuccess] = (action: performNullAction, nextState: .Ready)
-        actionMap[.Scanning]?[.ScanTimeout] = (action: performNullAction, nextState: .Start)
-        actionMap[.Scanning]?[.OffLine] = (action: performNullAction, nextState: .Start)
+        actionMap[.OffLine]?[.OnLine] = (action: [performNotifyOnLine], nextState: .OnLine)
+        actionMap[.OffLine]?[.OffLine] = (action: [performNotifyOffLine], nextState: .OffLine)
+        actionMap[.OffLine]?[.Retrieve] = (action: [performNotifyOffLine], nextState: .OffLine)
+        actionMap[.OffLine]?[.Scan] = (action: [performNotifyOffLine], nextState: .OffLine)
         //
-        actionMap[.Retrieving]?[.RetrieveFail] = (action: performNullAction, nextState: .Scanning)
-        actionMap[.Retrieving]?[.ConnectSuccess(nil)] = (action: performNullAction, nextState: .Ready)
-        actionMap[.Retrieving]?[.ConnectFail] = (action: performNullAction, nextState: .Start)
-        actionMap[.Retrieving]?[.Disconnected] = (action: performNullAction, nextState: .Scanning)
-        actionMap[.Retrieving]?[.OffLine] = (action: performNullAction, nextState: .Start)
+        actionMap[.Scanning]?[.ScanSuccess] = (action: [performNotifyScanSuccess, performNotifyReady], nextState: .Ready)
+        actionMap[.Scanning]?[.ScanTimeout] = (action: [performNotifyScanTimeout, performNotifyOnLine], nextState: .OnLine)
+        actionMap[.Scanning]?[.OffLine] = (action: [performNotifyOffLine], nextState: .OffLine)
         //
-        actionMap[.Ready]?[.Write] = (action: performConnect, nextState: .RWNotify)
-        actionMap[.Ready]?[.SetNotify] = (action: performConnect, nextState: .RWNotify)
-        actionMap[.Ready]?[.Read] = (action: performConnect, nextState: .RWNotify)
-        actionMap[.Ready]?[.ReadRSSI] = (action: performConnect, nextState: .ReadRSSI)
-        actionMap[.Ready]?[.Disconnected] = (action: performNullAction, nextState: nil)
-        actionMap[.Ready]?[.OffLine] = (action: performNullAction, nextState: .Start)
-        actionMap[.Ready]?[.Disconnected] = (action: performNullAction, nextState: nil)
-        actionMap[.Ready]?[.DisconnectedWithError] = (action: performNullAction, nextState: nil)
+        actionMap[.Retrieving]?[.RetrieveFail] = (action: [performNotifyScanning], nextState: .Scanning)
+        actionMap[.Retrieving]?[.ConnectSuccess(nil)] = (action: [performNotifyRetrieveSuccess, performNotifyReady], nextState: .Ready)
+        actionMap[.Retrieving]?[.ConnectFail] = (action: [performNotifyScanning], nextState: .Scanning)
+        actionMap[.Retrieving]?[.Disconnected] = (action: [performNotifyScanning], nextState: .Scanning)
+        actionMap[.Retrieving]?[.OffLine] = (action: [performNotifyOffLine], nextState: .OffLine)
         //
-        actionMap[.RWNotify]?[.ConnectSuccess(nil)] = (action: performDiscoverServices, nextState: nil)
-        actionMap[.RWNotify]?[.DiscoverServicesSuccess(nil)] = (action: performDiscoverCharacteristics, nextState: nil)
-        actionMap[.RWNotify]?[.DiscoverCharacteristicsSuccess(nil)] = (action: performCommand, nextState: .Ready)
-        actionMap[.RWNotify]?[.ConnectFail] = (action: performNullAction, nextState: .Ready)
-        actionMap[.RWNotify]?[.DiscoverServicesFail] = (action: performNullAction, nextState: .Ready)
-        actionMap[.RWNotify]?[.DiscoverCharacteristicsFail] = (action: performNullAction, nextState: .Ready)
-        actionMap[.RWNotify]?[.Disconnected] = (action: performNullAction, nextState: .Ready)
-        actionMap[.RWNotify]?[.DisconnectedWithError] = (action: performNullAction, nextState: .Ready)
-        actionMap[.RWNotify]?[.OffLine] = (action: performNullAction, nextState: .Start)
+        actionMap[.Ready]?[.Write] = (action: [performNullAction], nextState: .RWNotify)
+        actionMap[.Ready]?[.SetNotify] = (action: [performNullAction], nextState: .RWNotify)
+        actionMap[.Ready]?[.Read] = (action: [performNullAction], nextState: .RWNotify)
+        actionMap[.Ready]?[.ReadRSSI] = (action: [performNullAction], nextState: .ReadRSSI)
+        actionMap[.Ready]?[.OffLine] = (action: [performNotifyOffLine], nextState: .OffLine)
+        actionMap[.Ready]?[.Disconnected] = (action: [performNotifyDisconnected], nextState: nil)
+        actionMap[.Ready]?[.DisconnectedWithError] = (action: [performNotifyDisconnected], nextState: nil)
+        actionMap[.Ready]?[.Scan] = (action: [performNotifyScanning], nextState: .Scanning)
+        actionMap[.Ready]?[.Retrieve] = (action: [performNotifyRetrieving], nextState: .Scanning)
         //
-        actionMap[.ReadRSSI]?[.ConnectSuccess(nil)] = (action: performReadRSSI, nextState: .Ready)
-        actionMap[.ReadRSSI]?[.ConnectFail] = (action: performNullAction, nextState: .Ready)
-        actionMap[.ReadRSSI]?[.Disconnected] = (action: performNullAction, nextState: .Ready)
-        actionMap[.ReadRSSI]?[.DisconnectedWithError] = (action: performNullAction, nextState: .Ready)
-        actionMap[.ReadRSSI]?[.OffLine] = (action: performNullAction, nextState: .Start)
+        actionMap[.RWNotify]?[.ConnectSuccess(nil)] = (action: [performNotifyConnected, performDiscoverServices], nextState: nil)
+        actionMap[.RWNotify]?[.DiscoverServicesSuccess(nil)] = (action: [performDiscoverCharacteristics], nextState: nil)
+        actionMap[.RWNotify]?[.DiscoverCharacteristicsSuccess(nil)] = (action: [performCommand], nextState: .Ready)
+        actionMap[.RWNotify]?[.ConnectFail] = (action: [performNotifyDisconnected], nextState: .Ready)
+        actionMap[.RWNotify]?[.DiscoverServicesFail] = (action: [performNullAction], nextState: .Ready)
+        actionMap[.RWNotify]?[.DiscoverCharacteristicsFail] = (action: [performNullAction], nextState: .Ready)
+        actionMap[.RWNotify]?[.Disconnected] = (action: [performNotifyDisconnected], nextState: .Ready)
+        actionMap[.RWNotify]?[.DisconnectedWithError] = (action: [performNotifyDisconnected], nextState: .Ready)
+        actionMap[.RWNotify]?[.OffLine] = (action: [performNotifyOffLine], nextState: .OffLine)
+        //
+        actionMap[.ReadRSSI]?[.ConnectSuccess(nil)] = (action: [performNotifyConnected, performReadRSSI], nextState: .Ready)
+        actionMap[.ReadRSSI]?[.ConnectFail] = (action: [performNotifyDisconnected], nextState: .Ready)
+        actionMap[.ReadRSSI]?[.Disconnected] = (action: [performNotifyDisconnected], nextState: .Ready)
+        actionMap[.ReadRSSI]?[.DisconnectedWithError] = (action: [performNotifyDisconnected], nextState: .Ready)
+        actionMap[.ReadRSSI]?[.OffLine] = (action: [performNotifyOffLine], nextState: .OffLine)
 
         // Error map
-        errorMap[.Start] = (action: performNullAction, nextState: .Start)
-        errorMap[.Scanning] = (action: performNullAction, nextState: .Start)
-        errorMap[.Retrieving] = (action: performNullAction, nextState: .Start)
+        errorMap[.OnLine] = (action: performNullAction, nextState: .OnLine)
+        errorMap[.OffLine] = (action: performNullAction, nextState: .OnLine)
+        errorMap[.Scanning] = (action: performNullAction, nextState: .OnLine)
+        errorMap[.Retrieving] = (action: performNullAction, nextState: .OnLine)
         errorMap[.Ready] = (action: performNullAction, nextState: .Ready)
         errorMap[.RWNotify] = (action: performNullAction, nextState: .Ready)
         errorMap[.ReadRSSI] = (action: performNullAction, nextState: .Ready)
 
     }
     
-    private func handleEvent(event: BEvent) {
+    private func handleEvent(event: BEvent, info: String?) {
         if let mac = machine {
-            mac.handleEvent(event: event)
+            mac.handleEvent(event: event, info: info)
         }
     }
 
@@ -253,18 +272,36 @@ internal final class BleService: NSObject {
                                                     self.activeCommand = ActiveCommand(suuid: noti.key,
                                                                                        cuuid: noti.value,
                                                                                        command: .setNotify(true))
-                                                    self.cmdQueue.async { self.handleEvent(event: .SetNotify) }
+                                                    self.cmdQueue.async { self.handleEvent(event: .SetNotify, info: nil) }
                 }))
             }
         }
     }
-
+    
+    private func clearBleState() {
+        attachingWith = (nil, nil, false)
+        activeCommand = ActiveCommand(suuid: nil, cuuid: nil, command: .read)
+    }
+    
+    private func clearCommandQueue() {
+        for op in opQueue.operations {
+            if let aop = op as? AppOperation {
+                aop.isExecuting = false
+                aop.isFinished = true
+            }
+        }
+    }
+        
+    private func notifyBleStatus(status: BleStatus, info: String?) {
+        nc.post(name: .bleStatus, object: BleStatusPayload(status: status, info: info))
+    }
+    
     // MARK: - Public (Internal) API
     //
     func attachPeripheral(suuid: CBUUID, forceScan: Bool = false) {
         
         attachingWith = (nil, suuid, false)
-        cmdQueue.async { self.handleEvent(event: forceScan ? .Scan : .Retrieve) }
+        cmdQueue.async { self.handleEvent(event: forceScan ? .Scan : .Retrieve, info: nil) }
     }
     
     func read(suuid: CBUUID, cuuid: CBUUID) {
@@ -274,7 +311,7 @@ internal final class BleService: NSObject {
                                             self.activeCommand = ActiveCommand(suuid: suuid,
                                                                           cuuid: cuuid,
                                                                           command: .read)
-                                            self.cmdQueue.async { self.handleEvent(event: .Read) }
+                                            self.cmdQueue.async { self.handleEvent(event: .Read, info: nil) }
         }))
     }
     
@@ -285,7 +322,7 @@ internal final class BleService: NSObject {
                                             self.activeCommand = ActiveCommand(suuid: suuid,
                                                                           cuuid: cuuid,
                                                                           command: .write(data, response == true ? .withResponse : .withoutResponse))
-                                            self.cmdQueue.async { self.handleEvent(event: .Write) }
+                                            self.cmdQueue.async { self.handleEvent(event: .Write, info: nil) }
         }))
     }
     
@@ -298,7 +335,7 @@ internal final class BleService: NSObject {
                                             self.activeCommand = ActiveCommand(suuid: suuid,
                                                                           cuuid: cuuid,
                                                                           command: .setNotify(state))
-                                            self.cmdQueue.async { self.handleEvent(event: .SetNotify) }
+                                            self.cmdQueue.async { self.handleEvent(event: .SetNotify, info: nil) }
         }))
     }
     
@@ -308,7 +345,7 @@ internal final class BleService: NSObject {
                                             self.activeCommand = ActiveCommand(suuid: nil,
                                                                                cuuid: nil,
                                                                                command: .readRSSI)
-                                            self.cmdQueue.async { self.handleEvent(event: .ReadRSSI) }
+                                            self.cmdQueue.async { self.handleEvent(event: .ReadRSSI, info: nil) }
         }))
     }
 
@@ -318,11 +355,11 @@ internal final class BleService: NSObject {
 //
 extension BleService {
 
-    func performNullAction(event: BEvent, state: BState) {
+    func performNullAction(event: BEvent, state: BState, info: String?) {
         os_log("Trace: event %s, state %s", log: Log.ble, type: .info, event.description, state.description)
     }
     
-    func performScan(event: BEvent, state: BState) throws {
+    func performScan(event: BEvent, state: BState, info: String?) throws {
         os_log("In performScan, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
         guard let cm = centralManager, let suuid = attachingWith.suuid else {
             throw BleError.UninitialisedProperty
@@ -333,14 +370,13 @@ extension BleService {
                                  onTimeout: {
                                     os_log("Scan timed out", log: Log.ble, type: .info)
                                     cm.stopScan()
-                                    self.cmdQueue.async {
-                                        self.handleEvent(event: .ScanTimeout)
-                                    }},
+                                    self.cmdQueue.async { self.handleEvent(event: .ScanTimeout, info: nil) }
+                                    },
                                  onCancel: nil)
         cm.scanForPeripherals(withServices: [suuid], options: nil)
     }
 
-    func performConnect(event: BEvent, state: BState) throws {
+    func performConnect(event: BEvent, state: BState, info: String?) throws {
         os_log("In performConnect, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
         guard let cm = centralManager, let per = attachingWith.peripheral else {
             throw BleError.UninitialisedProperty
@@ -355,26 +391,25 @@ extension BleService {
         cm.connect(per, options: nil)
     }
 
-    func performStageOperation(thisEvent: BEvent, thisState: BState) {
-        os_log("In performNotifyAttached, event: %s state: %s", log: Log.ble, type: .info, thisEvent.description, thisState.description)
+    func performStageOperation(event: BEvent, state: BState, info: String?) {
+        os_log("In performStageOperation, event: %s state: %s", log: Log.ble, type: .info, event.description, state.description)
 
         if attachingWith.isAttached == false {
             attachingWith.isAttached = true
             if let per = attachingWith.peripheral, let suuid = attachingWith.suuid {
                 setLastAttachedPeripheral(defaults: ud, peripheral: per, suuid: suuid)
             }
-            nc.post(name: .bleStatus, object: BleStatusPayload(status: .ready))
         }
         else {
             completeOperation()
         }
     }
 
-    func performRetrieve(event: BEvent, state: BState) throws {
+    func performRetrieve(event: BEvent, state: BState, info: String?) throws {
         os_log("In performRetrieve, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
         guard let cm = centralManager, let suuid = attachingWith.suuid else {
             throw BleError.UninitialisedProperty }
-
+        
         if let lap = getLastAttachedPeripheral(defaults: ud), CBUUID(data: lap.suuidData) == suuid {
             os_log("Retrieving...", log: Log.ble, type: .info)
             if let per = cm.retrievePeripherals(withIdentifiers: [lap.peripheral]).first {
@@ -389,17 +424,17 @@ extension BleService {
                 cm.connect(per, options: nil)
             }
             else {
-                cmdQueue.async { self.handleEvent(event: .RetrieveFail) }
+                cmdQueue.async { self.handleEvent(event: .RetrieveFail, info: nil) }
             }
         }
         else {
-            cmdQueue.async { self.handleEvent(event: .RetrieveFail) }
+            cmdQueue.async { self.handleEvent(event: .RetrieveFail, info: nil) }
         }
     }
 
-    func performDiscoverServices(thisEvent: BEvent, thisState: BState) throws {
-        os_log("In performDiscoverServices, event: %s state %s", log: Log.ble, type: .info, thisEvent.description, thisState.description)
-        guard case BEvent.ConnectSuccess(let payload) = thisEvent, let pl = payload else {
+    func performDiscoverServices(event: BEvent, state: BState, info: String?) throws {
+        os_log("In performDiscoverServices, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
+        guard case BEvent.ConnectSuccess(let payload) = event, let pl = payload else {
             throw BleError.InvalidPayload }
         guard let suuid = activeCommand.suuid else {
             throw BleError.UninitialisedProperty }
@@ -407,9 +442,9 @@ extension BleService {
         pl.peripheral.discoverServices([suuid])
     }
 
-    func performDiscoverCharacteristics(thisEvent: BEvent, thisState: BState) throws {
-        os_log("In performDiscoverCharacteristics, event: %s state %s", log: Log.ble, type: .info, thisEvent.description, thisState.description)
-        guard case BEvent.DiscoverServicesSuccess(let payload) = thisEvent, let pl = payload else {
+    func performDiscoverCharacteristics(event: BEvent, state: BState, info: String?) throws {
+        os_log("In performDiscoverCharacteristics, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
+        guard case BEvent.DiscoverServicesSuccess(let payload) = event, let pl = payload else {
             throw BleError.InvalidPayload }
         guard let cuuid = activeCommand.cuuid else {
             throw BleError.UninitialisedProperty }
@@ -417,9 +452,9 @@ extension BleService {
         pl.peripheral.discoverCharacteristics([cuuid], for: pl.service)
     }
 
-    func performCommand(thisEvent: BEvent, thisState: BState) throws {
-        os_log("In performCommand, event: %s state %s", log: Log.ble, type: .info, thisEvent.description, thisState.description)
-        guard case BEvent.DiscoverCharacteristicsSuccess(let payload) = thisEvent, let pl = payload else {
+    func performCommand(event: BEvent, state: BState, info: String?) throws {
+        os_log("In performCommand, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
+        guard case BEvent.DiscoverCharacteristicsSuccess(let payload) = event, let pl = payload else {
             throw BleError.InvalidPayload }
             
             switch activeCommand.command {
@@ -434,31 +469,72 @@ extension BleService {
             }
     }
 
-    func performReadRSSI(thisEvent: BEvent, thisState: BState) throws {
-        os_log("In performReadRSSI, event: %s state %s", log: Log.ble, type: .info, thisEvent.description, thisState.description)
-        guard case BEvent.ConnectSuccess(let payload) = thisEvent, let pl = payload else {
+    func performReadRSSI(event: BEvent, state: BState, info: String?) throws {
+        os_log("In performReadRSSI, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
+        guard case BEvent.ConnectSuccess(let payload) = event, let pl = payload else {
             throw BleError.InvalidPayload }
         
         pl.peripheral.readRSSI()
     }
 
-    func performReset(thisEvent: BEvent, thisState: BState) throws {
-        os_log("In performReset, event: %s state %s", log: Log.ble, type: .info, thisEvent.description, thisState.description)
+    func performReset(event: BEvent, state: BState, info: String?) throws {
+        os_log("In performReset, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
 
-        if case BEvent.OffLine = thisEvent {
-            // CoreBluetooth has gone off-line, notify out
-            nc.post(name: .bleStatus, object: BleStatusPayload(status: .offLine))
-        }
+        clearBleState()
+        clearCommandQueue()
+    }
+    
+    /**
+     A set of functions to publish BleStatus to upstream listeners.  BleStatus does not map 1-to-1 to BEvent; not all BEvents need to be published.
+     */
+    func performNotifyOnLine(event: BEvent, state: BState, info: String?) throws {
+        os_log("In performNotifyOnLine, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
+        notifyBleStatus(status: .onLine, info: info)
+    }
 
-        attachingWith = (nil, nil, false)
-        activeCommand = ActiveCommand(suuid: nil, cuuid: nil, command: .read)
-        
-        for op in opQueue.operations {
-            if let aop = op as? AppOperation {
-                aop.isExecuting = false
-                aop.isFinished = true
-            }
-        }
+    func performNotifyOffLine(event: BEvent, state: BState, info: String?) throws {
+        os_log("In performNotifyOffLine, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
+        notifyBleStatus(status: .offLine, info: info)
+    }
+
+    func performNotifyScanning(event: BEvent, state: BState, info: String?) throws {
+        os_log("In performNotifyScanning, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
+        notifyBleStatus(status: .scanning, info: info)
+    }
+    
+    func performNotifyScanTimeout(event: BEvent, state: BState, info: String?) throws {
+    os_log("In performNotifyScanTimeout, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
+        notifyBleStatus(status: .scanTimeout, info: info)
+    }
+    
+    func performNotifyScanSuccess(event: BEvent, state: BState, info: String?) throws {
+    os_log("In performNotifyScanSuccess, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
+        notifyBleStatus(status: .scanSuccess, info: info) // info == peripheral uuid
+    }
+
+    func performNotifyRetrieving(event: BEvent, state: BState, info: String?) throws {
+    os_log("In performNotifyRetrieving, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
+        notifyBleStatus(status: .retrieving, info: info)
+    }
+    
+    func performNotifyRetrieveSuccess(event: BEvent, state: BState, info: String?) throws {
+    os_log("In performNotifyRetrieveSuccess, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
+        notifyBleStatus(status: .retrieveSuccess, info: info) // info == peripheral uuid
+    }
+    
+    func performNotifyReady(event: BEvent, state: BState, info: String?) throws {
+        os_log("In performNotifyReady, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
+        notifyBleStatus(status: .ready, info: info)
+    }
+    
+    func performNotifyConnected(event: BEvent, state: BState, info: String?) throws {
+        os_log("In performNotifyConnected, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
+        notifyBleStatus(status: .connected, info: info)
+    }
+
+    func performNotifyDisconnected(event: BEvent, state: BState, info: String?) throws {
+        os_log("In performNotifyDisconnected, event: %s state %s", log: Log.ble, type: .info, event.description, state.description)
+        notifyBleStatus(status: .disconnected, info: info)
     }
 
 }
@@ -469,24 +545,21 @@ extension BleService: CBCentralManagerDelegate {
     public func centralManagerDidUpdateState(_ central: CBCentralManager) {
         os_log("Central Manager state: %s", log: Log.ble, type: .info, central.state.description)
         
-        var status: BleStatus
-        
         switch central.state {
         case .poweredOn:
-            status = .onLine
+            cmdQueue.async { self.handleEvent(event: .OnLine, info: nil) }
         case .poweredOff, .resetting, .unsupported, .unknown:
-            status = .offLine
+            cmdQueue.async { self.handleEvent(event: .OffLine, info: nil) }
         case .unauthorized:     // iOS 13+ requires user authorisation
              os_log("Bluetooth unauthorised - set authorisation in Info.plist", log: Log.ble, type: .error, central.state.description)
              assertionFailure()
-             status = .offLine
+             cmdQueue.async { self.handleEvent(event: .OffLine, info: nil) }
          @unknown default:
              os_log("Unknown central state - verify valid states for this iOS version", log: Log.ble, type: .error, central.state.description)
              assertionFailure()
-             status = .offLine
+             cmdQueue.async { self.handleEvent(event: .OffLine, info: nil) }
          }
         
-        nc.post(name: .bleStatus, object: BleStatusPayload(status: status))
     }
     
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
@@ -498,15 +571,12 @@ extension BleService: CBCentralManagerDelegate {
         if attachingWith.peripheral == nil {        // Discard duplicate discoveries
             peripheral.delegate = self
             attachingWith.peripheral = peripheral
-            cmdQueue.async { self.handleEvent(event: .ScanSuccess) }
+            cmdQueue.async { self.handleEvent(event: .ScanSuccess, info: peripheral.identifier.uuidString) }
         }
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         os_log("In didConnect: %s", log: Log.ble, type: .info, peripheral.identifier.uuidString)
-
-        nc.post(name: .connectStatus,
-                object: ConnectStatusPayload(status: .connected))
 
         let timeout: TimeInterval
         if case BleCommand.readRSSI = activeCommand.command { timeout = readRSSITimeout }
@@ -520,31 +590,27 @@ extension BleService: CBCentralManagerDelegate {
                                   onCancel: nil)
 
         let payload = PPayload(peripheral: peripheral)
-        cmdQueue.async { self.handleEvent(event: .ConnectSuccess(payload)) }
+        cmdQueue.async { self.handleEvent(event: .ConnectSuccess(payload), info: peripheral.identifier.uuidString) }
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         os_log("In didFailToConnect: %s", log: Log.ble, type: .info, peripheral.identifier.uuidString)
 
-        nc.post(name: .connectStatus, object: ConnectStatusPayload(status: .disconnected))
-
-        cmdQueue.async { self.handleEvent(event: .ConnectFail) }
+        cmdQueue.async { self.handleEvent(event: .ConnectFail, info: nil) }
         
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         os_log("In didFailToConnect: %s", log: Log.ble, type: .info, peripheral.identifier.uuidString)
 
-        nc.post(name: .connectStatus, object: ConnectStatusPayload(status: .disconnected))
-
         if error == nil {
             // Intentional disconnect
-            cmdQueue.async { self.handleEvent(event: .Disconnected) }
+            cmdQueue.async { self.handleEvent(event: .Disconnected, info: nil) }
         }
         else {
             // Unexpected disconnect
             os_log("Peripheral disconnected with error", log: Log.ble, type: .error)
-            cmdQueue.async { self.handleEvent(event: .DisconnectedWithError) }
+            cmdQueue.async { self.handleEvent(event: .DisconnectedWithError, info: nil) }
         }
         
     }
@@ -559,11 +625,11 @@ extension BleService: CBPeripheralDelegate {
             let suuid = activeCommand.suuid,
             let svcs = peripheral.services,
             let thisSvce = (svcs.filter { $0.uuid == suuid }).first else {
-                cmdQueue.async { self.handleEvent(event: .DiscoverServicesFail) }
+                cmdQueue.async { self.handleEvent(event: .DiscoverServicesFail, info: nil) }
                 return }
         
         let payload = PSPayload(peripheral: peripheral, service: thisSvce)
-        cmdQueue.async { self.handleEvent(event: .DiscoverServicesSuccess(payload)) }
+        cmdQueue.async { self.handleEvent(event: .DiscoverServicesSuccess(payload), info: nil) }
     }
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
@@ -571,11 +637,11 @@ extension BleService: CBPeripheralDelegate {
             let cuuid = activeCommand.cuuid,
             let characs = service.characteristics,
             let thisCharac = (characs.filter { $0.uuid == cuuid }).first else {
-                cmdQueue.async { self.handleEvent(event: .DiscoverCharacteristicsFail) }
+                cmdQueue.async { self.handleEvent(event: .DiscoverCharacteristicsFail, info: nil) }
                 return }
         
         let payload = PSCPayload(peripheral: peripheral, service: service, charac: thisCharac)
-        cmdQueue.async { self.handleEvent(event: .DiscoverCharacteristicsSuccess(payload)) }
+        cmdQueue.async { self.handleEvent(event: .DiscoverCharacteristicsSuccess(payload), info: nil) }
     }
 
     // MARK: Data Callbacks
@@ -639,9 +705,9 @@ extension BleService: CBPeripheralDelegate {
 //
 // MARK: State Map Aliases
 //
-typealias StateActionMap = Dictionary<BState, (onEntry: ((BEvent, BState) throws ->())?, onExit: ((BEvent, BState) throws ->())?)>
-typealias ActionMap = Dictionary<BState, Dictionary<BEvent, (action: ((BEvent, BState) throws ->())?, nextState: BState?)>>
-typealias ErrorMap = Dictionary<BState, (action: ((BEvent, BState) -> ())?, nextState: BState)>
+typealias StateActionMap = Dictionary<BState, (onEntry: ((BEvent, BState, String?) throws ->())?, onExit: ((BEvent, BState, String?) throws ->())?)>
+typealias ActionMap = Dictionary<BState, Dictionary<BEvent, (action: [((BEvent, BState, String?) throws ->())]?, nextState: BState?)>>
+typealias ErrorMap = Dictionary<BState, (action: ((BEvent, BState, String?) -> ())?, nextState: BState)>
 
 // MARK: State, Event, Action Enumerations
 //
@@ -650,7 +716,8 @@ typealias ErrorMap = Dictionary<BState, (action: ((BEvent, BState) -> ())?, next
 // Valid states
 //
 enum BState: Int, CaseIterable {
-    case Start
+    case OnLine
+    case OffLine
     case Scanning
     case Retrieving
     case Ready
@@ -662,7 +729,8 @@ extension BState: CustomStringConvertible {
 
     var description: String {
         switch self {
-        case .Start: return "Start"
+        case .OnLine: return "OnLine"
+        case .OffLine: return "OffLine"
         case .Scanning: return "Scanning"
         case .Retrieving: return "Retrieving"
         case .Ready: return "Ready"
@@ -688,6 +756,7 @@ enum BEvent {
     case ScanTimeout
     case Retrieve
     case RetrieveFail
+    case RetrieveConnectFail
     case ConnectSuccess(PPayload?)
     case ConnectFail
     case ConnectAttemptTimeout
@@ -704,6 +773,7 @@ enum BEvent {
     case DiscoverCharacteristics
     case DiscoverCharacteristicsSuccess(PSCPayload?)
     case DiscoverCharacteristicsFail
+    case Rescan
 
 }
 
@@ -719,6 +789,7 @@ extension BEvent: CustomStringConvertible {
         case .ScanTimeout: return "Scan Timeout"
         case .Retrieve: return "Retrieve"
         case .RetrieveFail: return "RetrieveFail"
+        case .RetrieveConnectFail: return "RetrieveConnectFail"
         case .ConnectSuccess: return "Connect Success"
         case .ConnectFail: return "Connect Fail"
         case .ConnectAttemptTimeout: return "Connect Attempt Timeout"
@@ -735,6 +806,7 @@ extension BEvent: CustomStringConvertible {
         case .DiscoverCharacteristics: return "Discover Characteristics"
         case .DiscoverCharacteristicsSuccess: return "Discover Characteristics Success"
         case .DiscoverCharacteristicsFail: return "Discover Characteristics Fail"
+        case .Rescan: return "ReScan"
         }
     }
 }
@@ -771,6 +843,8 @@ extension BEvent: Hashable {
         case .DiscoverCharacteristics: hasher.combine(21)
         case .DiscoverCharacteristicsSuccess: hasher.combine(22)
         case .DiscoverCharacteristicsFail: hasher.combine(23)
+        case .Rescan: hasher.combine(24)
+        case .RetrieveConnectFail: hasher.combine(25)
         }
     }
 }
@@ -782,7 +856,7 @@ fileprivate final class Machine {
     private var stateActionMap: StateActionMap = [:]
     private var actionMap: ActionMap = [:]
     private var errorMap: ErrorMap = [:]
-    private var currentState:BState? = .Start
+    private var currentState:BState? = .OnLine
 
     // MARK: Initialisation
     //
@@ -823,7 +897,7 @@ fileprivate final class Machine {
      - For each state, an error handling function and a next state are specified
                  
      */
-    internal func handleEvent(event: BEvent) {
+    internal func handleEvent(event: BEvent, info: String?) {
         // Event processing cannot be nested
         // Ensure that machine is not currently processing an event
         guard let savedState = currentState else {
@@ -837,7 +911,7 @@ fileprivate final class Machine {
 
         // Check for valid event for this state
         guard let tr = actionMap[savedState]?[event] else {
-            errorMap[savedState]?.action?(event, savedState)
+            errorMap[savedState]?.action?(event, savedState, info)
             currentState = errorMap[savedState]?.nextState
             assertionFailure("Invalid event \(event) for state \(savedState)")
             return
@@ -846,16 +920,18 @@ fileprivate final class Machine {
         do {
             // Execute state exit action
             if let _ = tr.nextState {
-                try stateActionMap[savedState]?.onExit?(event, savedState)
+                try stateActionMap[savedState]?.onExit?(event, savedState, info)
             }
             
             // Execute transition action
-            try tr.action?(event, savedState)
+            if let tra = tr.action {
+                try tra.forEach( { try $0(event, savedState, info) } )
+            }
 
             // Enter next state, execute entry action
             if let ns = tr.nextState  {
                 currentState = ns
-                try stateActionMap[ns]?.onEntry?(event, ns)
+                try stateActionMap[ns]?.onEntry?(event, ns, info)
             }
             else { currentState = savedState }
         }
@@ -863,7 +939,7 @@ fileprivate final class Machine {
             os_log("ERROR: %s, Event: %s, State: %s", log: Log.ble, type: .error,
                    error.localizedDescription, event.description, savedState.description)
             assertionFailure(error.localizedDescription)
-            errorMap[savedState]?.action?(event, savedState)
+            errorMap[savedState]?.action?(event, savedState, info)
             currentState = errorMap[savedState]?.nextState
         }
     }

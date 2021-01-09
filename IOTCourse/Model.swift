@@ -150,6 +150,16 @@ internal let alsLuminBleMinValue = UInt16(alsLuminMinValue)
 internal let alsLuminBleMaxValue = UInt16(alsLuminMaxValue)
 
 //
+// Entity default values
+//
+internal let lssRgbDefault          = Rgb(red: 0.0, green: 0.0, blue: 0.0)
+internal let lssOffOnDefault        = false
+internal let alsLuminDefault        = alsLuminMinValue
+internal let alsThreshDefault       = alsThreshMinValue
+internal let alsHystDefault         = alsHystMinValue
+internal let alsOffOnDefault        = false
+
+//
 // Entity definitions
 //
 fileprivate protocol Entity {
@@ -542,7 +552,7 @@ internal final class Model {
     
     private let bleService: BleService
     private let primaryService: CBUUID
-    private var bleStatus: BleStatus = .offLine
+    private var isAttached:Bool = false
     private let redLed: BinaryEntity
     private let greenLed: BinaryEntity
     private let leftButton: BinaryEntity
@@ -593,21 +603,21 @@ internal final class Model {
                         cuuid: lssRgbUuid,
                         permission: kPermitRead | kPermitWrite,
                         bleService: bleService,
-                        defaultValue: Rgb(red: 0.0, green: 0.0, blue: 0.0))
+                        defaultValue: lssRgbDefault)
         offOn = BinaryEntity(name: kEntityLssOffOn,
                              topic: .entityLssOffOn,
                              suuid: lssServiceUuid,
                              cuuid: lssOffOnUuid,
                              permission: kPermitRead | kPermitWrite,
                              bleService: bleService,
-                             defaultValue: false)
+                             defaultValue: lssOffOnDefault)
         lumin = IntegerEntity(name: kEntityAlsLumin,
                               topic: .entityAlsLumin,
                               suuid: alsServiceUuid,
                               cuuid: alsLuminUuid,
                               permission: kPermitRead | kPermitNotify,
                               bleService: bleService,
-                              defaultValue: alsLuminMinValue,
+                              defaultValue: alsLuminDefault,
                               minValue: alsLuminMinValue,
                               maxValue: alsLuminMaxValue,
                               bleMinValue: alsLuminBleMinValue,
@@ -618,7 +628,7 @@ internal final class Model {
                                cuuid: alsThreshUuid,
                                permission: kPermitRead | kPermitWrite,
                                bleService: bleService,
-                               defaultValue: alsThreshMinValue,
+                               defaultValue: alsThreshDefault,
                                minValue: alsThreshMinValue,
                                maxValue: alsThreshMaxValue,
                                bleMinValue: alsThreshBleMinValue,
@@ -629,7 +639,7 @@ internal final class Model {
                                   cuuid: alsHystUuid,
                                   permission: kPermitRead | kPermitWrite,
                                   bleService: bleService,
-                                  defaultValue: alsHystMinValue,
+                                  defaultValue: alsHystDefault,
                                   minValue: alsHystMinValue,
                                   maxValue: alsHystMaxValue,
                                   bleMinValue: alsHystBleMinValue,
@@ -664,6 +674,7 @@ internal final class Model {
                           alsLmOffOnUuid : .binary(lmOffOn)
         ]
         setupSubscriptions()
+        os_log("Model initialised...", log: Log.model, type: .info)
     }
 
     // MARK: - Private functions
@@ -673,14 +684,13 @@ internal final class Model {
         nc.addObserver(forName: .bleStatus, object: nil, queue: nil, using: { notification in
             
             if let payload = notification.object as? BleStatusPayload {
-                self.bleStatus = payload.status
+                //self.bleStatus = payload.status
                 os_log("BleService is %s", log: Log.model, type: .info, payload.status.description)
                 switch payload.status {
-                    case .onLine:
-                        self.bleService.attachPeripheral(suuid: self.primaryService, forceScan: false)
-                    case .offLine:
-                        break
+                case .onLine, .offLine, .scanning, .retrieving:
+                        self.isAttached = false
                     case .ready:
+                        self.isAttached = true
                         self.getRssi()
                         self.rgb.get()
                         self.offOn.get()
@@ -695,6 +705,8 @@ internal final class Model {
 //                        self.rightButton.get()
 //                        self.leftButton.setNotify(state: true)
 //                        self.rightButton.setNotify(state: true)
+                default:
+                    break
                 }
             }})
         
@@ -767,10 +779,24 @@ internal final class Model {
 
     }
 
+    private func resetModel() {
+        // Apply value changes at the BleService interface such that new values are published out to UI
+        offOn.valueChanged(data: Data(from: lssOffOnDefault == false ? 0 : 1))
+        rgb.valueChanged(data: Data(from: BleRgb(red: UInt8(lssRgbDefault.red),
+                                                 green: UInt8(lssRgbDefault.green),
+                                                 blue: UInt8(lssRgbDefault.blue))))
+        lumin.valueChanged(data: Data(from: UInt16(alsLuminDefault)))
+        thresh.valueChanged(data: Data(from: UInt16(alsThreshDefault)))
+        hyst.valueChanged(data: Data(from: UInt8(alsHystDefault)))
+        lmOffOn.valueChanged(data: Data(from: alsOffOnDefault == false ? 0 : 1))
+        // clear RSSI (fake entity)
+        nc.post(name: .entityRSSI, object: IntegerPayload(value: 0, isNotifying: false, didWrite: false))
+    }
+    
     // MARK: - Public (Internal) API
     //
     func get(entity: String) {
-        guard let thisEntity = lookUpByEntity[entity], bleStatus == .ready else { return }
+        guard let thisEntity = lookUpByEntity[entity], isAttached == true else { return }
 
         switch thisEntity {
         case .binary(let bin):
@@ -785,7 +811,7 @@ internal final class Model {
     }
     
     func set(entity: String, value: EntityValue, response: Bool) {
-        guard let thisEntity = lookUpByEntity[entity], bleStatus == .ready else { return }
+        guard let thisEntity = lookUpByEntity[entity], isAttached == true else { return }
 
         switch thisEntity {
         case .binary(let bin):
@@ -804,7 +830,7 @@ internal final class Model {
     }
     
     func setNotify(entity: String, state: Bool) {
-        guard let thisEntity = lookUpByEntity[entity], bleStatus == .ready else { return }
+        guard let thisEntity = lookUpByEntity[entity], isAttached == true else { return }
 
         switch thisEntity {
         case .binary(let bin):
@@ -823,4 +849,8 @@ internal final class Model {
         bleService.readRssi()
     }
 
+    func scan() {
+        resetModel()
+        bleService.attachPeripheral(suuid: self.primaryService, forceScan: false)
+    }
 }

@@ -268,7 +268,10 @@
                                 <constraints>
                                     <constraint firstAttribute="width" secondItem="4no-lo-93m" secondAttribute="height" multiplier="1:1" id="WSo-79-XwN"/>
                                 </constraints>
-                                <state key="normal" image="ellipsis"/>
+                                <state key="normal" image="radar"/>
+                                <connections>
+                                    <action selector="scanButtonTouchUpInside:" destination="KYp-Tl-hdo" eventType="touchUpInside" id="XKz-W8-0Q1"/>
+                                </connections>
                             </button>
                             <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="msH-Pl-f8V">
                                 <rect key="frame" x="258" y="0.0" width="80" height="40"/>
@@ -345,6 +348,7 @@
                         <outlet property="moreButton" destination="4no-lo-93m" id="mOB-iY-E4m"/>
                         <outlet property="offOnButton" destination="msH-Pl-f8V" id="CzD-TP-XD3"/>
                         <outlet property="rssiLabel" destination="vEB-Rs-LrR" id="h1F-aB-km4"/>
+                        <outlet property="scanButton" destination="4no-lo-93m" id="rML-4Q-qRc"/>
                     </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="OmO-8h-8cd" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
@@ -353,9 +357,9 @@
         </scene>
     </scenes>
     <resources>
-        <image name="ellipsis" width="40" height="40"/>
         <image name="lampOff" width="30" height="30"/>
         <image name="notAttached" width="40" height="40"/>
+        <image name="radar" width="40" height="40"/>
         <image name="sliders" width="40" height="40"/>
         <image name="sun" width="40" height="40"/>
         <image name="sunDarkSm" width="30" height="30"/>
